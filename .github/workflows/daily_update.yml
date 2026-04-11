@@ -1,0 +1,45 @@
+name: Daily Maritime Data Update
+
+on:
+  schedule:
+    - cron: '0 20 * * 1-5'  # weekdays 20:00 UTC (post-market close)
+  workflow_dispatch:          # allow manual trigger from GitHub UI
+
+jobs:
+  update-maritime-data:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Set up GCP credentials
+        run: echo "${{ secrets.GCP_KEY }}" > gcp_key.json
+
+      - name: Fetch Baltic Dry Index (BDI) and upload to BigQuery
+        env:
+          NASDAQ_API_KEY: ${{ secrets.NASDAQ_API_KEY }}
+          BQ_PROJECT:     ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET:     ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/ingest_bdi.py
+
+      - name: Fetch Port Weather and upload to BigQuery
+        env:
+          WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
+          BQ_PROJECT:      ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET:      ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/ingest_weather.py
+
+      - name: Cleanup credentials
+        if: always()
+        run: rm -f gcp_key.json
