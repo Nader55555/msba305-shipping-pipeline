@@ -1,0 +1,69 @@
+UN COMTRADE — DATA QUALITY REPORT
+Generated: 2026-04-04 21:06
+Source file: TradeData_4_4_2026_18_51_44.csv
+=======================================================
+
+BEFORE CLEANING
+  Rows:          16,444
+  Total nulls:   57,351
+  Columns:       33
+
+AFTER CLEANING
+  Rows:          16,444  (removed 0)
+  Total nulls:   44,987
+
+MISSING VALUE DECISIONS
+  trade_value_usd → DELETED (critical column, no value = unusable row)
+  net_weight_kg   → IMPUTED with 0 (optional field, weight_estimated=True)
+  transport_mode  → FLAGGED as 'Not specified' (optional UN field)
+  quantity        → IMPUTED with 0 (not all reporters submit quantity)
+
+OUTLIERS
+  Flagged: 301 rows (>3 std dev per HS code)
+  Strategy: is_outlier=True flag — NOT deleted (large values are legitimate)
+
+COVERAGE
+  Years:      [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+  Countries:  188 unique reporters
+  HS codes:   [10, 26, 27, 72, 89]
+
+TRADE VALUE (USD)
+  Min:    $0
+  Max:    $535,339,702,649
+  Mean:   $4,080,832,944
+  Median: $135,833,372
+
+NULL % BY COLUMN (after cleaning)
+year                     0.0
+period                   0.0
+reporter_code            0.0
+reporter_iso             0.0
+reporter_country         0.0
+flow_code                0.0
+flow_direction           0.0
+partner_code             0.0
+partner_iso              0.0
+partner_country          0.0
+hs_code                  0.0
+commodity                0.0
+aggregation_level        0.0
+is_leaf                  0.0
+transport_mode_code      0.0
+transport_mode           0.0
+qty_unit_code            0.0
+qty_unit               100.0
+quantity                 0.0
+qty_estimated            0.0
+net_weight_kg            0.0
+weight_estimated         0.0
+isGrossWgtEstimated      0.0
+cif_value_usd           39.0
+fob_value_usd           34.6
+trade_value_usd          0.0
+is_outlier               0.0
+trade_balance_usd        0.0
+value_per_kg           100.0
+decade                   0.0
+source                   0.0
+data_type                0.0
+granularity              0.0
