@@ -1,0 +1,6 @@
+gcp_key.json
+data/raw/*
+!data/raw/.gitkeep
+__pycache__/
+.ipynb_checkpoints/
+.env
