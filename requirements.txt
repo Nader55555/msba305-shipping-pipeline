@@ -3,7 +3,6 @@ numpy==1.26.2
 matplotlib==3.8.2
 seaborn==0.13.0
 requests==2.31.0
-nasdaqdatalink==1.0.4
 google-cloud-bigquery==3.13.0
 google-cloud-bigquery-storage==2.24.0
 google-auth==2.25.2
