@@ -22,7 +22,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Set up GCP credentials
-        run: echo "${{ secrets.GCP_KEY }}" > gcp_key.json
+        run: printf '%s' '${{ secrets.GCP_KEY }}' > gcp_key.json
 
       - name: Fetch Port Weather and upload to BigQuery
         env:
