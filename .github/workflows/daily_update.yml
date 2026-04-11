@@ -32,6 +32,13 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
         run: python scripts/ingest_weather.py
 
+      - name: Update combined CSV and upload to BigQuery
+        env:
+          BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET: ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/update_combined.py
+
       - name: Cleanup credentials
         if: always()
         run: rm -f gcp_key.json
