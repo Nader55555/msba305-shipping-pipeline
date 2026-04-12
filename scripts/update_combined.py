@@ -7,7 +7,7 @@ Can also be run manually: python scripts/update_combined.py
 
 Sources:
   data/clean/un_comtrade_clean.csv   — static (from notebooks, annual)
-  data/clean/bdi_clean.csv           — updated daily by ingest_bdi.py (Stooq)
+  data/clean/bdi_clean.csv           — manual update (see README, re-run notebook 02)
   data/clean/aisstream_clean.csv     — static (from notebooks)
   data/clean/port_weather_clean.csv  — updated daily by ingest_weather.py
   data/clean/strait_conditions.csv   — updated daily by ingest_weather.py
@@ -98,6 +98,17 @@ if not comtrade.empty and "hs_code" in comtrade.columns:
 
 
 
+
+
+# ── 2. UPLOAD BDI SOURCE TABLE TO BIGQUERY ───────────────────────────────────
+# bdi_clean.csv is manually updated (notebook 02 + investing.com download).
+# Uploading it here keeps BigQuery bdi_daily in sync every daily run,
+# so SQL queries and the dashboard always reflect the latest committed CSV.
+print("\n[2] Uploading bdi_daily source table to BigQuery...")
+if not bdi.empty:
+    upload(bdi, "bdi_daily", "WRITE_TRUNCATE")
+else:
+    print("  ✗ bdi_clean.csv not found — bdi_daily not updated")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
