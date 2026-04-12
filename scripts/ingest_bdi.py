@@ -1,22 +1,22 @@
 """
 scripts/ingest_bdi.py
-Fetch the latest Baltic Dry Index (BDI) daily data from Stooq.com.
-No API key required — Stooq provides free public CSV downloads.
+Fetch the latest Baltic Dry Index (BDI) daily data.
+No API key required.
+
+Primary source:  Yahoo Finance via yfinance (symbol ^BDIY) — reliable, maintained
+Fallback source: Stooq.com direct CSV download (multiple symbol variants)
 
 How it works:
   1. Load existing data/clean/bdi_clean.csv (full history from your notebook)
   2. Find the last date already in the file
-  3. Fetch only the new rows from Stooq (last_date+1 to today)
+  3. Fetch only the new rows (last_date+1 to today)
   4. Append new rows, then recompute ALL derived columns on the full dataset
      (rolling averages must be recalculated on full history to be correct)
   5. Save updated bdi_clean.csv
   6. Upload full dataset to BigQuery bdi_daily (WRITE_TRUNCATE)
 
 Scheduled: GitHub Actions daily 20:00 UTC weekdays.
-Runs BEFORE ingest_weather.py and update_combined.py so analytical
-tables always get fresh BDI data on the same run.
-
-First run / recovery: if bdi_clean.csv is missing, fetches all available history.
+Runs BEFORE ingest_weather.py and update_combined.py.
 """
 
 import os
@@ -38,83 +38,191 @@ RAW_PATH   = f"{RAW_DIR}/bdi_raw_latest.csv"
 os.makedirs(CLEAN_DIR, exist_ok=True)
 os.makedirs(RAW_DIR,   exist_ok=True)
 
-STOOQ_SYMBOL = "bdiy.uk"
-STOOQ_BASE   = "https://stooq.com/q/d/l/"
+
+# ── PRIMARY: Yahoo Finance via yfinance ───────────────────────────────────────
+def fetch_yfinance(start_date_str=None, end_date_str=None):
+    """
+    Fetch BDI from Yahoo Finance.  Symbol: ^BDIY (Baltic Dry Index)
+    start_date_str / end_date_str: 'YYYY-MM-DD' strings (optional).
+    Returns cleaned DataFrame or None on failure.
+    """
+    try:
+        import yfinance as yf
+
+        if start_date_str and end_date_str:
+            # yfinance end is exclusive — add 1 day to include the end date
+            end_dt  = datetime.strptime(end_date_str, "%Y-%m-%d") + timedelta(days=1)
+            end_str = end_dt.strftime("%Y-%m-%d")
+            hist = yf.download("^BDIY", start=start_date_str, end=end_str,
+                               progress=False, auto_adjust=False)
+        else:
+            hist = yf.download("^BDIY", period="max",
+                               progress=False, auto_adjust=False)
+
+        if hist is None or hist.empty:
+            print("  yfinance: returned empty data for ^BDIY")
+            return None
+
+        # Flatten MultiIndex columns (yfinance returns these for single ticker)
+        if isinstance(hist.columns, pd.MultiIndex):
+            hist.columns = [col[0] for col in hist.columns]
+
+        hist = hist.reset_index()
+        hist.rename(columns={
+            "Date":   "date",
+            "Open":   "bdi_open",
+            "High":   "bdi_high",
+            "Low":    "bdi_low",
+            "Close":  "bdi_value",
+            "Volume": "bdi_volume",
+        }, inplace=True)
+
+        hist["date"] = pd.to_datetime(hist["date"], errors="coerce")
+        hist = hist[hist["date"].notna()].copy()
+
+        for col in ["bdi_value", "bdi_open", "bdi_high", "bdi_low"]:
+            if col in hist.columns:
+                hist[col] = pd.to_numeric(hist[col], errors="coerce")
+                hist[col] = hist[col].replace(0, np.nan)
+
+        hist["bdi_volume"] = pd.to_numeric(
+            hist.get("bdi_volume", 0), errors="coerce"
+        ).fillna(0)
+
+        hist["bdi_change_pct"] = np.nan
+        hist = hist[hist["bdi_value"].notna()].copy()
+        hist.sort_values("date", inplace=True)
+        hist.reset_index(drop=True, inplace=True)
+
+        if hist.empty:
+            print("  yfinance: no valid rows after cleaning")
+            return None
+
+        print(f"  yfinance: {len(hist)} rows "
+              f"({hist['date'].min().date()} → {hist['date'].max().date()})")
+        return hist[["date", "bdi_value", "bdi_open", "bdi_high", "bdi_low",
+                     "bdi_volume", "bdi_change_pct"]]
+
+    except ImportError:
+        print("  yfinance not installed — skipping (add yfinance to requirements.txt)")
+        return None
+    except Exception as e:
+        print(f"  yfinance error: {e}")
+        return None
+
+
+# ── FALLBACK: Stooq.com ───────────────────────────────────────────────────────
+STOOQ_BASE    = "https://stooq.com/q/d/l/"
+STOOQ_SYMBOLS = ["bdiy.uk", "bdiy", "bdi.uk"]
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     ),
+    "Accept": "text/csv,text/plain,*/*",
 }
 
 
-def fetch_stooq(start_date=None, end_date=None, retries=3):
+def fetch_stooq(start_date_str=None, end_date_str=None):
     """
-    Fetch BDI from Stooq.com.
-    start_date / end_date: 'YYYYMMDD' strings (optional).
-    Returns raw DataFrame with columns: Date, Open, High, Low, Close, Volume
+    Fallback: fetch BDI from Stooq.com. Tries multiple symbol variants.
+    Returns cleaned DataFrame or None on failure.
+    Prints response preview so you can debug what Stooq actually returns.
     """
-    params = {"s": STOOQ_SYMBOL, "i": "d"}
-    if start_date:
-        params["d1"] = start_date
-    if end_date:
-        params["d2"] = end_date
+    d1 = start_date_str.replace("-", "") if start_date_str else None
+    d2 = end_date_str.replace("-", "")   if end_date_str   else None
 
-    for attempt in range(retries):
+    for symbol in STOOQ_SYMBOLS:
+        params = {"s": symbol, "i": "d"}
+        if d1: params["d1"] = d1
+        if d2: params["d2"] = d2
+
         try:
-            r = requests.get(STOOQ_BASE, params=params, headers=HEADERS, timeout=20)
-            if r.status_code == 200 and "Date" in r.text:
+            r = requests.get(STOOQ_BASE, params=params,
+                             headers=HEADERS, timeout=20)
+            # Always print what Stooq actually returned so we can debug
+            preview = r.text[:150].replace("\n", " ")
+            print(f"  Stooq [{symbol}]: HTTP {r.status_code} | "
+                  f"response: {preview!r}")
+
+            if r.status_code != 200:
+                continue
+
+            # Try to parse as CSV regardless of what the content looks like
+            try:
                 df = pd.read_csv(io.StringIO(r.text))
-                if not df.empty and "Date" in df.columns:
-                    return df
-                print(f"  Stooq returned empty data (attempt {attempt + 1})")
-            else:
-                print(f"  Stooq HTTP {r.status_code} (attempt {attempt + 1})")
+            except Exception as parse_err:
+                print(f"  Stooq [{symbol}]: not valid CSV ({parse_err})")
+                continue
+
+            if "Date" not in df.columns or df.empty:
+                print(f"  Stooq [{symbol}]: CSV columns={df.columns.tolist()[:6]}, "
+                      f"rows={len(df)} — no usable data")
+                continue
+
+            # Clean
+            df.rename(columns={
+                "Date":   "date",
+                "Open":   "bdi_open",
+                "High":   "bdi_high",
+                "Low":    "bdi_low",
+                "Close":  "bdi_value",
+                "Volume": "bdi_volume",
+            }, inplace=True)
+
+            df["date"] = pd.to_datetime(df["date"], errors="coerce")
+            df = df[df["date"].notna()].copy()
+
+            for col in ["bdi_value", "bdi_open", "bdi_high", "bdi_low"]:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(
+                        df[col].astype(str).str.replace(",", "", regex=False),
+                        errors="coerce")
+                    df[col] = df[col].replace(0, np.nan)
+
+            df["bdi_volume"] = pd.to_numeric(
+                df.get("bdi_volume", 0), errors="coerce"
+            ).fillna(0)
+
+            df["bdi_change_pct"] = np.nan
+            df = df[df["bdi_value"].notna()].copy()
+
+            if df.empty:
+                print(f"  Stooq [{symbol}]: no valid rows after cleaning")
+                continue
+
+            df.sort_values("date", inplace=True)
+            df.reset_index(drop=True, inplace=True)
+            print(f"  Stooq [{symbol}]: {len(df)} rows "
+                  f"({df['date'].min().date()} → {df['date'].max().date()})")
+            return df[["date", "bdi_value", "bdi_open", "bdi_high", "bdi_low",
+                        "bdi_volume", "bdi_change_pct"]]
+
         except Exception as e:
-            print(f"  Stooq fetch error (attempt {attempt + 1}): {e}")
-        if attempt < retries - 1:
-            time.sleep(3)
+            print(f"  Stooq [{symbol}]: {e}")
+            time.sleep(1)
+
+    print("  Stooq: all symbol variants failed")
     return None
 
 
-def clean_stooq(raw):
-    """
-    Clean Stooq CSV into the same schema as bdi_clean.csv.
-    Mirrors the column renaming and numeric cleaning in notebook 02.
-    Stooq columns: Date, Open, High, Low, Close, Volume
-    """
-    df = raw.copy()
-    df.rename(columns={
-        "Date":   "date",
-        "Open":   "bdi_open",
-        "High":   "bdi_high",
-        "Low":    "bdi_low",
-        "Close":  "bdi_value",
-        "Volume": "bdi_volume",
-    }, inplace=True)
+def fetch_new_bdi(start_date_str=None, end_date_str=None):
+    """Try yfinance first, fall back to Stooq."""
+    print("  Trying yfinance (primary)...")
+    result = fetch_yfinance(start_date_str, end_date_str)
+    if result is not None and not result.empty:
+        return result, "yfinance"
 
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df = df[df["date"].notna()].copy()
+    print("  Trying Stooq (fallback)...")
+    result = fetch_stooq(start_date_str, end_date_str)
+    if result is not None and not result.empty:
+        return result, "stooq"
 
-    for col in ["bdi_value", "bdi_open", "bdi_high", "bdi_low"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(
-                df[col].astype(str).str.replace(",", "", regex=False),
-                errors="coerce",
-            )
-            df[col] = df[col].replace(0, np.nan)
-
-    if "bdi_volume" in df.columns:
-        df["bdi_volume"] = pd.to_numeric(df["bdi_volume"], errors="coerce").fillna(0)
-
-    df["bdi_change_pct"] = np.nan  # recomputed in add_derived_columns
-    df = df[df["bdi_value"].notna()].copy()
-    df.sort_values("date", inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    return df
+    return None, None
 
 
+# ── DERIVED COLUMNS ───────────────────────────────────────────────────────────
 def add_derived_columns(df):
     """
     Recompute all derived columns on the FULL dataset — mirrors notebook Cell 12.
@@ -143,16 +251,17 @@ def add_derived_columns(df):
     df["quarter"]          = df["date"].dt.quarter
     df["weekday"]          = df["date"].dt.day_name()
 
-    df["source"]           = "stooq_bdi"
+    df["source"]           = "yfinance_bdi"
     df["data_type"]        = "freight_index"
     df["granularity"]      = "daily"
 
     return df
 
 
+# ── MAIN ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    now_str   = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+    now_str  = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     today_dt  = datetime.now(timezone.utc).date()
 
     print("=" * 60)
@@ -170,45 +279,42 @@ if __name__ == "__main__":
     else:
         existing  = pd.DataFrame()
         last_date = None
-        print("  bdi_clean.csv not found — will fetch full history from Stooq")
+        print("  bdi_clean.csv not found — will fetch full history")
 
-    # ── 2. Fetch new rows from Stooq ─────────────────────────────────────────
-    print("\n[2/4] Fetching new BDI data from Stooq.com...")
+    # ── 2. Fetch new rows ─────────────────────────────────────────────────────
+    print("\n[2/4] Fetching new BDI data...")
     if last_date is not None and last_date >= today_dt:
-        print("  Already up to date — no new rows needed")
-        new_df = pd.DataFrame()
+        print("  Already up to date — skipping fetch")
+        new_df   = pd.DataFrame()
+        src_used = None
     else:
         start_str = (
-            (last_date + timedelta(days=1)).strftime("%Y%m%d")
+            (last_date + timedelta(days=1)).strftime("%Y-%m-%d")
             if last_date else None
         )
         label = f"from {start_str}" if start_str else "full history"
         print(f"  Fetching {label} → {today_str} ...")
-        raw = fetch_stooq(start_date=start_str, end_date=today_str)
+        new_df, src_used = fetch_new_bdi(start_str, today_str)
 
-        if raw is None or raw.empty:
-            print("  ✗ Stooq returned no data.")
-            print("    Likely cause: today is a weekend or holiday — no BDI published.")
-            print("    Proceeding with existing data (no new rows appended).")
-            new_df = pd.DataFrame()
+        if new_df is None or new_df.empty:
+            print("\n  ✗ Both sources returned no data.")
+            print("  Normal on weekends and market holidays — no BDI published.")
+            print("  Proceeding with existing data. No new rows appended.")
+            new_df   = pd.DataFrame()
+            src_used = None
         else:
-            new_df = clean_stooq(raw)
-            if new_df.empty:
-                print("  No new valid rows after cleaning")
-            else:
-                print(f"  ✓ Fetched {len(new_df)} new row(s): "
-                      f"{new_df['date'].min().date()} → {new_df['date'].max().date()}")
-                new_df.to_csv(RAW_PATH, index=False)
+            print(f"  ✓ Source: {src_used} | {len(new_df)} new row(s)")
+            new_df.to_csv(RAW_PATH, index=False)
 
-    # ── 3. Merge and recompute derived columns ────────────────────────────────
+    # ── 3. Merge and recompute ────────────────────────────────────────────────
     print("\n[3/4] Merging and recomputing derived columns on full dataset...")
 
-    BASE_COLS = ["date", "bdi_value", "bdi_open", "bdi_high", "bdi_low",
-                 "bdi_volume", "bdi_change_pct"]
+    BASE_COLS = ["date", "bdi_value", "bdi_open", "bdi_high",
+                 "bdi_low", "bdi_volume", "bdi_change_pct"]
 
     if not existing.empty and not new_df.empty:
         exist_base = existing[[c for c in BASE_COLS if c in existing.columns]].copy()
-        new_base   = new_df[[c for c in BASE_COLS if c in new_df.columns]].copy()
+        new_base   = new_df[[c   for c in BASE_COLS if c in new_df.columns]].copy()
         merged = (
             pd.concat([exist_base, new_base], ignore_index=True)
             .drop_duplicates("date")
@@ -217,14 +323,14 @@ if __name__ == "__main__":
         print(f"  Merged: {len(merged):,} total rows ({len(new_df)} new)")
     elif existing.empty and not new_df.empty:
         merged = new_df[[c for c in BASE_COLS if c in new_df.columns]].copy()
-        print(f"  Full Stooq history: {len(merged):,} rows")
+        print(f"  Full history: {len(merged):,} rows")
     else:
         merged = existing[[c for c in BASE_COLS if c in existing.columns]].copy()
         print(f"  No new rows — recomputing on {len(merged):,} existing rows")
 
     full = add_derived_columns(merged)
 
-    # Validation — mirrors notebook Cell 14
+    # Validation
     errors = []
     if full["bdi_value"].isnull().sum() > 0: errors.append("FAIL: nulls in bdi_value")
     if (full["bdi_value"] < 0).any():        errors.append("FAIL: negative BDI value")
@@ -235,7 +341,8 @@ if __name__ == "__main__":
         raise ValueError("BDI validation failed — aborting upload.")
 
     print(f"  ✓ Validation passed | shape: {full.shape} | "
-          f"spikes: {int(full['is_spike'].sum())} | drops: {int(full['is_drop'].sum())}")
+          f"spikes: {int(full['is_spike'].sum())} | "
+          f"drops: {int(full['is_drop'].sum())}")
 
     full["date"] = full["date"].dt.strftime("%Y-%m-%d")
     full.to_csv(CLEAN_PATH, index=False)
@@ -267,6 +374,7 @@ if __name__ == "__main__":
     signal    = ("SPIKE (>+5%)" if latest["is_spike"]
                  else "DROP (>-5%)" if latest["is_drop"]
                  else "Normal")
+    print(f"Source used:  {src_used or 'none (no new data today)'}")
     print(f"Latest BDI:   {latest['bdi_value']:.0f}  ({latest['date']})")
     print(f"5-day change: {change_5d:+.0f}")
     print(f"Today signal: {signal}")
