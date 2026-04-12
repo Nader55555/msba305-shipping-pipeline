@@ -24,7 +24,16 @@ jobs:
       - name: Set up GCP credentials
         run: printf '%s' '${{ secrets.GCP_KEY }}' > gcp_key.json
 
-      - name: Fetch Port Weather and upload to BigQuery
+      # Step 1: BDI — fetch latest from Stooq (no API key needed)
+      - name: Fetch BDI and upload to BigQuery
+        env:
+          BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET: ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/ingest_bdi.py
+
+      # Step 2: Weather + straits — fetch from OpenWeatherMap
+      - name: Fetch Port Weather and Strait Conditions, upload to BigQuery
         env:
           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
           BQ_PROJECT:      ${{ secrets.BQ_PROJECT }}
@@ -32,7 +41,8 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
         run: python scripts/ingest_weather.py
 
-      - name: Update combined CSV and upload to BigQuery
+      # Step 3: Rebuild all 10 analytical tables from fresh data
+      - name: Rebuild analytical tables and upload to BigQuery
         env:
           BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
           BQ_DATASET: ${{ secrets.BQ_DATASET }}
