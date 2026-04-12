@@ -24,7 +24,7 @@ jobs:
       - name: Set up GCP credentials
         run: printf '%s' '${{ secrets.GCP_KEY }}' > gcp_key.json
 
-      # Step 1: BDI — fetch latest from Stooq (no API key needed)
+      # Step 1: BDI — tries macrotrends.net, then investing.com, then manual CSV
       - name: Fetch BDI and upload to BigQuery
         env:
           BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
