@@ -6,7 +6,7 @@ on:
   workflow_dispatch:          # allow manual trigger from GitHub UI
 
 # BDI is updated manually — see README for instructions.
-# GitHub Actions only runs weather + analytical table rebuilds.
+# AIS, Weather and analytical tables run automatically daily.
 
 jobs:
   update-maritime-data:
@@ -36,7 +36,17 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
         run: python scripts/ingest_weather.py
 
-      # Step 2: Rebuild all 10 analytical tables from fresh data
+      # Step 2: AIS vessel tracking — 4-minute collection at 8 straits + 20 ports
+      - name: Collect AIS vessel positions, upload to BigQuery
+        env:
+          AISSTREAM_API_KEY:    ${{ secrets.AISSTREAM_API_KEY }}
+          AIS_COLLECT_SECONDS: "240"
+          BQ_PROJECT:          ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET:          ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/ingest_ais.py
+
+      # Step 3: Rebuild all 12 analytical tables from fresh data
       - name: Rebuild analytical tables and upload to BigQuery
         env:
           BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
