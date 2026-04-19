@@ -165,7 +165,8 @@ def load_csv() -> dict:
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div style="font-size:22px;font-weight:700;color:#e8f0f8;margin-bottom:2px;">⚓ Maritime Intel</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size:11px;color:#4a7fa5;margin-bottom:20px;">MSBA 305 — Shipping Pipeline</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:11px;color:#90c4e8;margin-bottom:4px;">MSBA 305 — Data Processing Framework</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:10px;color:#8aacc8;margin-bottom:20px;">American University of Beirut<br>Dr. Ahmad El-Hajj | Spring 2025/2026</div>', unsafe_allow_html=True)
 
     page = st.radio("Navigation", [
         "📊 Executive Summary",
