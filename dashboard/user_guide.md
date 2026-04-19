@@ -5,7 +5,7 @@
 
 ## What is this dashboard?
 
-This dashboard gives you a daily briefing on global shipping conditions. It combines 4 data sources — trade flows, freight costs, weather, and live vessel tracking — to answer one simple question every morning:
+This dashboard gives you a **daily morning briefing on global shipping conditions**. It combines 4 live data sources — trade flows, freight costs, weather, and vessel tracking — to answer one simple question:
 
 > **"Is global shipping operating normally today, and if not, where and why?"**
 
@@ -22,6 +22,91 @@ You don't need to know anything about shipping to use it. This guide explains ev
 
 ---
 
+## The 20 monitored ports — why these specifically?
+
+Yes, 20 ports are monitored. These are **the 20 busiest container and bulk cargo ports in the world by annual throughput (TEUs and tonnage)**, chosen because disruptions at these ports affect the largest share of global trade. They are:
+
+Shanghai, Singapore, Ningbo-Zhoushan, Shenzhen, Guangzhou, Busan, Tianjin, Hong Kong, Rotterdam, Dubai, Port Klang, Antwerp, Xiamen, Los Angeles, Hamburg, Long Beach, Tanjung Pelepas, Kaohsiung, Dalian, New York.
+
+Together these 20 ports handle approximately **60% of global container trade**. If a port not on this list is disrupted, it has a much smaller impact on global supply chains.
+
+---
+
+## The 8 critical straits — why these 8?
+
+The 8 straits are the world's most important **maritime chokepoints** — narrow waterways where massive amounts of trade must pass through. They were chosen because each one, if blocked, would cause immediate global disruption.
+
+| Strait | Location | Why it matters |
+|--------|----------|----------------|
+| **Strait of Hormuz** | Between Iran and Oman | 20% of all global oil passes here. Every tanker from Saudi Arabia, Kuwait, UAE, and Iraq must use it. |
+| **Strait of Malacca** | Between Malaysia and Indonesia | The busiest strait in the world by ship count (~100,000 ships/year). Almost everything between Asia and Europe/Middle East uses it. |
+| **Suez Canal** | Egypt | Ships save ~14 days vs going around Africa. 12% of world trade passes through. |
+| **Bab el-Mandeb** | Between Yemen and Djibouti | The southern entrance to Suez. Ships coming from Asia must pass here before reaching the canal. |
+| **Bosphorus Strait** | Turkey | Connects Black Sea to Mediterranean. Critical for Russian and Ukrainian grain and oil exports. |
+| **Strait of Gibraltar** | Between Spain and Morocco | Gateway between Atlantic and Mediterranean. All Europe-Asia traffic via Suez must pass through. |
+| **Strait of Dover** | Between UK and France | The world's busiest shipping lane by vessel count — over 500 ships per day. |
+| **Lombok Strait** | Indonesia | Alternative to Malacca for supertankers (VLCCs) too large or fully laden to safely use Malacca. |
+
+---
+
+## Disruption score — what does "above 40" mean?
+
+The disruption score (0–100) combines **weather conditions + geopolitical risk baseline** for each strait. It is not just weather — geopolitical risk is built in from the start (for example, Bab el-Mandeb starts at 40/100 even on a perfectly calm day because of active regional conflict risk).
+
+| Score range | Color | What it means | What to do |
+|-------------|-------|---------------|------------|
+| 0–20 | 🟢 Green | Normal conditions | Nothing — standard operations |
+| 21–40 | 🟢 Green | Moderate — slightly elevated | Monitor, no action needed |
+| 41–60 | 🟠 Orange | **Elevated risk** | Plan contingency routes, factor into logistics |
+| 61–100 | 🔴 Red | **Critical** | Rerouting likely, expect cost and time increases |
+
+**Why 40 as the threshold?** A score above 40 means the combination of weather and geopolitical factors is significant enough to meaningfully affect shipping decisions. Below 40, the risk is present but manageable within normal operations.
+
+---
+
+## The 5 commodity categories (HS codes)
+
+The dashboard tracks these 5 product categories from UN Comtrade:
+
+| Code | Name | What it includes | Why tracked |
+|------|------|-----------------|-------------|
+| **HS 10** | Cereals | Wheat, rice, corn, barley | Transported on bulk carriers; highly sensitive to BDI and port disruptions |
+| **HS 26** | Ores & slag | Iron ore, copper ore, bauxite | Very high volume, bulk ships; main cargo from Australia/Brazil to China |
+| **HS 27** | Mineral fuels | Crude oil, natural gas, coal | Transported by tankers; directly affected by Hormuz/Bab el-Mandeb disruptions |
+| **HS 72** | Iron & steel | Steel products, pig iron | Heavy bulk cargo; connects China with global markets |
+| **HS 89** | Ships & boats | Vessels themselves | Tracks the shipbuilding industry (South Korea, China, Japan) |
+
+These 5 categories were chosen because they represent **the majority of bulk and tanker cargo** — the types of shipping directly measured by the Baltic Dry Index.
+
+---
+
+## BDI signals — BULLISH, BEARISH, NEUTRAL explained
+
+The Baltic Dry Index (BDI) is the daily price to rent a bulk cargo ship. It moves based on supply (how many ships are available) and demand (how much cargo needs shipping).
+
+| Signal | What it means | What to do |
+|--------|--------------|------------|
+| 🔺 **BULLISH** | Rates are rising quickly — more demand than supply | **Lock in long-term charter contracts now** before rates get more expensive. Avoid the spot market. |
+| 🔻 **BEARISH** | Rates are falling — more ships than cargo | **Use spot market** — wait and book at cheaper rates. Don't commit to long-term charters now. |
+| ↔ **NEUTRAL** | No clear direction — market is balanced | Monitor weekly. No urgent action needed. |
+| ⚠ **OVERBOUGHT** | Rates are historically very high | Consider **hedging** — shipping costs may be unsustainable and could fall. |
+| 💡 **OVERSOLD** | Rates are historically very cheap | Excellent time to **lock in future cargo capacity** at low rates. |
+
+**Simple analogy:** Think of BDI like petrol prices. BULLISH = prices at the pump are rising fast, fill up now. BEARISH = prices falling, wait before filling up.
+
+---
+
+## 🟡 WATCH status — what does it mean?
+
+**WATCH** (yellow) means conditions are above normal but not yet at a level requiring immediate action. It is a warning to:
+- Check this route/strait daily over the next few days
+- Have a contingency routing plan ready
+- Avoid committing to tight delivery deadlines through this area
+
+Think of it like an **amber traffic light** — not stopped, but slow down and be prepared.
+
+---
+
 ## The 8 pages — what each one tells you
 
 ---
@@ -33,239 +118,189 @@ This page shows the most important numbers at a glance:
 
 | KPI | What it means |
 |-----|--------------|
-| **BDI** | The price of shipping bulk cargo today. Higher = more expensive. |
-| **Ports at risk** | How many of the 20 monitored ports have dangerous wind conditions today (Beaufort ≥ 7) |
-| **Straits elevated risk** | How many of the 8 critical chokepoints have disruption scores above 40/100 |
-| **Total export value** | Total value of tracked commodities in the database |
-| **Vessels tracked** | Number of unique ships seen by AIS today |
-| **BDI Signal** | Today's market signal: BULLISH / BEARISH / NEUTRAL |
+| **BDI** | Today's freight cost index. Higher = more expensive to ship. |
+| **Ports at risk** | How many of the 20 monitored ports have dangerous wind (Beaufort ≥ 7 = near gale) |
+| **Straits elevated risk** | How many of the 8 chokepoints have a score above 40/100 |
+| **Total export value** | Total value of tracked commodities across all years in the database |
+| **Vessels tracked (AIS)** | Number of unique ships captured in today's AIS collection |
+| **BDI Signal** | Today's market signal: BULLISH / BEARISH / NEUTRAL (explained above) |
 
 **Below the KPIs:**
-- **Route Disruption Status** — the 6 main global shipping lanes, each labeled 🔴 DISRUPTED / 🟡 WATCH / 🟢 CLEAR
+- 🔴/🟡/🟢 **Route status** — the 6 main global shipping lanes
 - **Port Weather Alerts** — any port with dangerous wind conditions
-- **Strait Conditions** — all 8 chokepoints with their risk scores
-- **BDI sparkline** — BDI trend over the last 90 days
+- **Strait Conditions** — all 8 chokepoints with scores
+- **BDI sparkline** — last 90 days trend
 
-**What to do with this page:**
-- If you see 🔴 DISRUPTED routes → go to Route Disruption page for details
-- If BDI signal says BULLISH → freight costs are rising, check Baltic Dry Index page
-- If Straits elevated risk is 3 or more → check Strait Monitor
+**Morning routine:**
+1. Is any route 🔴 DISRUPTED? → Go to Route Disruption page
+2. Is BDI signal BULLISH? → Go to Baltic Dry Index page
+3. Are 3+ straits above 40? → Go to Strait Monitor page
 
 ---
 
 ### ⚡ 2. Strait Monitor
-**Real-time status of the 8 most critical shipping chokepoints in the world.**
+**Real-time status of the 8 most critical chokepoints.**
 
-Every large ship must pass through one of these narrow passages. If a strait is disrupted, thousands of ships may need to reroute, adding days and millions of dollars in cost.
+**Key metrics explained:**
+- **Straits monitored**: Always 8
+- **Critical / High risk**: How many straits have a score above 40 out of 8. If this says "1 / 4" it means 1 is critical and 4 are elevated. A ratio above 4/8 = more than half the world's chokepoints are at risk — serious situation.
+- **Trade% at elevated risk**: What percentage of world seaborne trade passes through straits with score >40. If 46%, nearly half of all global trade is at some risk of disruption.
+- **Oil% at elevated risk**: What percentage of world oil supply passes through straits with score >40. This directly affects energy prices globally.
 
-**The 8 straits monitored:**
+**The disruption score bar chart**: All 8 straits ranked. The dashed line at 40 = elevated risk threshold. The line at 60 = critical threshold.
 
-| Strait | Why it matters |
-|--------|---------------|
-| **Bab el-Mandeb** | Red Sea entrance to Suez Canal — all Asia↔Europe traffic |
-| **Strait of Hormuz** | 20% of world's oil passes through here |
-| **Suez Canal** | Saves 14 days vs going around Africa |
-| **Bosphorus Strait** | Black Sea grain and oil exports |
-| **Strait of Gibraltar** | Atlantic↔Mediterranean gateway |
-| **Strait of Malacca** | Busiest strait by ship count — Asia hub |
-| **Strait of Dover** | English Channel — 500+ ships per day |
-| **Lombok Strait** | Alternative to Malacca for supertankers |
-
-**Reading the disruption score (0–100):**
-- **0–20**: Normal conditions ✅
-- **21–40**: Moderate — monitor 👁
-- **41–60**: Elevated risk — plan contingency ⚡
-- **61–100**: Critical — rerouting likely 🔴
-
-**The bar chart** compares all 8 straits visually. The dashed lines mark the elevated risk and critical thresholds.
-
-**The map** shows where each strait is on the globe, colored by risk level.
+**The map**: Each strait shown as a colored dot on the world map — 🔴 critical, 🟠 elevated, 🟢 normal.
 
 ---
 
 ### 🚢 3. Route Disruption
 **Daily status of the 6 key global trade lanes.**
 
-These are the main highways of global shipping. When they're disrupted, goods take longer and cost more to deliver.
-
-| Route | Key strait | Main cargo |
-|-------|-----------|------------|
-| **Middle East Oil → Asia** | Strait of Hormuz | Oil, LNG |
-| **Asia → Europe (Suez)** | Bab el-Mandeb + Suez | Containers, steel |
-| **Black Sea Grain Exports** | Bosphorus | Wheat, corn |
-| **Atlantic / Europe ↔ Mediterranean** | Strait of Gibraltar | Containers |
-| **Asia intra-regional** | Strait of Malacca | Containers |
-| **Trans-Pacific (Asia → US West Coast)** | None (open ocean) | Electronics, steel |
+| Metric | Explanation |
+|--------|-------------|
+| **Routes monitored** | Always 6 |
+| **Disrupted / Watch** | How many routes are disrupted vs on watch. "3 / 1" means 3 disrupted, 1 on watch. More than 2 disrupted = serious supply chain pressure globally. |
+| **Avg strait score** | Average disruption score across all 6 route straits. Above 40/100 = generally elevated conditions worldwide. |
 
 **Status labels:**
-- 🔴 **DISRUPTED** — active disruption, ships likely rerouting
-- 🟡 **WATCH** — risk is elevated, monitor closely
-- 🟢 **CLEAR** — normal operations
-
-Each card shows the strait score, affected commodities, alternative routing options, and a generated risk label based on the score (not hardcoded text).
-
-The bar chart at the bottom shows all 6 routes ranked by their disruption score.
+- 🔴 **DISRUPTED** — score ≥ 40 or critical geopolitical risk. Ships are likely rerouting.
+- 🟡 **WATCH** — score between 20–40. Conditions worth monitoring daily.
+- 🟢 **CLEAR** — score below 20. Normal operations.
 
 ---
 
 ### 📈 4. Baltic Dry Index (BDI)
 **The price of shipping — is freight getting cheaper or more expensive?**
 
-The BDI is published daily by the Baltic Exchange in London. It measures the cost to rent a bulk cargo ship (for grain, iron ore, coal). Think of it like a price index for ship rentals.
-
 **Key numbers:**
-- **Current BDI**: Today's value. Historical average is around 1,500. Above 2,500 = expensive. Below 800 = cheap.
+- **Current BDI**: Today's value. Historical average ~1,500. Above 2,500 = expensive. Below 800 = cheap. A context line below the KPIs shows exactly how today's BDI compares to the 10-year average in %.
 - **Period high/low**: The range over your selected date range
-- **Spikes/Drops**: Days when BDI moved more than 5% in one day — indicates market volatility
+- **Spikes/Drops**: Days when BDI moved >5% in one day — indicates volatility
 
-**Market signals:**
-| Signal | Meaning | What to do |
-|--------|---------|------------|
-| 🔺 **BULLISH** | Rates are rising fast | Lock in long-term charter contracts now before they get more expensive |
-| 🔻 **BEARISH** | Rates are falling | Use spot market — wait for cheaper rates |
-| ↔ **NEUTRAL** | No clear direction | Monitor, no urgent action |
-| ⚠ **OVERBOUGHT** | Rates are very high vs history | Consider hedging or delaying non-urgent shipments |
-| 💡 **OVERSOLD** | Rates are very low vs history | Good time to book future capacity at cheap rates |
+**Seasonal pattern (Monthly BDI Seasonality chart):**
+- 🟢 **Cheapest months**: January, February, March — post-Chinese New Year slowdown in factory output
+- 🟠 **Most expensive**: September, October, November — pre-holiday season restocking drives demand
 
-**Seasonal pattern (Monthly BDI chart):**
-- **Cheapest months**: January, February, March (post-Chinese New Year slowdown)
-- **Most expensive**: September, October, November (pre-holiday season restocking)
-
-The BDI history chart shows major events like COVID-19 (2020 crash), the Suez Canal blockage (2021 spike), and supply chain crisis peak (2021-2022).
+**Charter Recommendations table:**
+- **BEARISH** → Use spot market, avoid long-term charter
+- **BULLISH** → Lock in long-term charter now
+- **NEUTRAL** → Monitor, no action
+- **OVERBOUGHT** → Consider hedging
+- **OVERSOLD** → Good entry point for future capacity
 
 ---
 
 ### 🌍 5. Trade Analysis
-**Who exports what, how much, and where do they send it?**
+**Who exports what, how much, and where?**
 
-This page uses UN Comtrade data covering 2015–2025 for 5 commodity categories:
-- **HS 10**: Cereals (wheat, rice, corn)
-- **HS 26**: Ores & slag (iron ore, copper ore)
-- **HS 27**: Mineral fuels (oil, gas, coal)
-- **HS 72**: Iron & steel
-- **HS 89**: Ships & boats
+**Top 15 Exporters**: USA ranks #1 mainly due to LNG (liquefied natural gas = HS 27) exports. Saudi Arabia and Australia are #2 and #3 from mineral fuels and iron ore.
 
-**Top 15 Exporters chart**: Who sells the most of these commodities globally. USA #1 is correct — mainly due to mineral fuels (LNG) exports.
+**Trade Balance chart**: 🟢 Green = net exporter (sells more than it buys). 🔴 Red = net importer (buys more than it sells). China being a large net importer in these categories means it relies heavily on incoming bulk cargo — making Chinese port weather critically important.
 
-**Trade Balance chart**: Green bar = net exporter (sells more than it buys). Red bar = net importer (buys more than it sells). China being a large net importer means it needs a lot of ships coming IN with raw materials.
+**BDI vs Trade Correlation chart**: Blue bars = total export value by year (left axis). Single orange line = average annual BDI (right axis). When both rise together = healthy demand-driven shipping market. When BDI rises but trade falls = shipping is expensive due to supply shortage, not real demand.
 
-**BDI vs Trade correlation**: When freight costs (orange BDI line) rise faster than trade values (blue bars), shipping is consuming a larger share of commodity profits — especially damaging for low-value bulk cargo like grain.
-
-**Year-on-Year heatmap**: Green = export growth, Red = export decline. NaN = data not available for that year.
+**Year-on-Year Heatmap**: 🟢 Green = export growth that year. 🔴 Red = export decline. NaN = data not submitted to UN Comtrade that year.
 
 ---
 
 ### ⚓ 6. Port Risk
-**Weather conditions at the 20 most important ports in the world.**
+**Weather at the 20 most important ports.**
 
-**Beaufort wind scale — what it means for ships:**
-| Beaufort | Speed | Impact |
-|----------|-------|--------|
+**Beaufort wind scale — when does it matter?**
+
+| Beaufort | Wind speed | Impact on shipping |
+|----------|-----------|-------------------|
 | 0–3 | 0–5 m/s | No effect |
 | 4–6 | 6–12 m/s | Light caution |
-| **7** | **14–17 m/s** | **⚠ Loading/unloading may stop** |
+| **7** | **14–17 m/s** | ⚠ **Near Gale — crane operations may stop, loading/unloading delayed** |
 | 8–9 | 18–24 m/s | Port operations severely disrupted |
 | 10–12 | 25+ m/s | Port may close entirely |
 
-**Port cards** show each port's current temperature, wind speed, weather type, humidity, and trade exposure. The 🟡 badge = disruption warning.
+**Why Beaufort 7 is the threshold**: At 7 (Near Gale, 14+ m/s), most port cranes must stop operating for safety. Container ships cannot safely berth or depart. This is the internationally accepted threshold where port operations become seriously affected.
 
-**"Trade: N/A"** means the port's country didn't match a trade-flow record in the analytical table for that filter — the weather data is still real and accurate. It does not mean the port has no trade.
-
-**Net Exporters table**: Shows major exporting countries and whether their home ports currently have weather disruptions.
+**"Trade: N/A"**: Means the port's country didn't match a trade-flow record in that filter — weather data is still real.
 
 ---
 
 ### 🛥 7. Vessel Activity
 **Where are ships right now — across 8 straits and major ports globally.**
 
-This page shows data from AISStream — live vessel position data collected automatically every weekday during a 4-minute collection window at 20:00 UTC.
+Vessel data is collected automatically every weekday at 20:00 UTC via a 4-minute AIS collection window.
 
-**Key metrics (top row):**
-- **Total messages**: Raw AIS position messages received
-- **Unique vessels**: Number of distinct ships seen today
-- **Moving vessels**: Ships currently underway (speed > 0.5 knots)
-- **Avg speed**: Average speed across all vessels in knots
-- **Tankers**: Number of oil/chemical tankers specifically tracked
+**Key metrics:**
+- **Total messages**: Raw AIS position signals received
+- **Unique vessels**: Distinct ships identified
+- **Moving vessels**: Ships with speed > 0.5 knots
+- **Avg speed**: In knots (1 knot = 1.85 km/h)
+- **Tankers**: Oil/chemical tankers specifically
 
-**Congestion alerts**: Ports where the vessel count is unusually high trigger a 🟡 CONGESTION warning. Rotterdam at 2,700+ vessels is the busiest port in Europe — that's normal. Los Angeles and New York at 100+ is also normal. A CONGESTION alert combined with bad weather at the same port is a serious delay signal.
+**Congestion alerts**: High vessel count at a port = 🟡 CONGESTION warning. Rotterdam at 3,000+ vessels is normal — it's Europe's busiest port. CONGESTION combined with bad weather = serious delay risk.
 
-**Vessel positions map (world map):**
-All captured vessels plotted on a real map across all monitored locations. Hover over any dot to see the ship's name, speed, navigation status, and destination.
-- Larger dots = moving vessels
-- Smaller faded dots = stationary/anchored vessels
-- Colors match the legend: 🔴 Tankers · 🔵 Cargo · 🟡 Tug/Support · 🟢 Fishing
-
-> **Coverage note:** AIS signals are received by land-based stations (~40–50 nautical miles from shore). The Persian Gulf, Red Sea, and Strait of Hormuz have sparser AIS receiver coverage on the free tier. If no vessels appear in those areas, it means the receivers in that region didn't capture signals during the 4-minute collection window — not that the area has no traffic.
-
-**Vessel types pie chart**: Breakdown by ship category — Cargo, Tanker, Passenger, Fishing, Tug/Support, Other.
+**Vessel positions map**: World map showing all tracked vessels. Hover to see name, speed, status, destination. Larger dot = moving vessel.
 
 **Speed categories:**
-- Stationary (< 0.5 kn): Anchored or moored
-- Slow/manoeuvring (0.5–3 kn): Entering/leaving port
-- Transit (3–10 kn): Normal sailing
-- Cruising (> 10 kn): Open ocean sailing
+- **Stationary** (< 0.5 kn): At anchor or moored
+- **Slow/manoeuvring** (0.5–3 kn): Entering or leaving port
+- **Transit** (3–10 kn): Normal sailing
+- **Cruising** (> 10 kn): Open ocean passage
 
-**Strait vessel traffic trends** (below the map):
-Shows daily vessel counts per strait over time, built from the automated daily AIS collection. This is one of the most powerful features in the dashboard:
+**Top vessel destinations chart**: Shows the 15 most common declared destinations from ship AIS transponders. Useful for understanding where cargo is actually heading — confirms or challenges route disruption signals. Destinations starting with "@" are AIS padding and are filtered out automatically.
 
-| What you see | What it means |
-|---|---|
-| Vessel count dropping at Hormuz | Ships may be avoiding the Persian Gulf — early disruption signal |
-| Tanker count dropping while cargo stays normal | Energy-specific threat, not a general disruption |
-| Count rising sharply at a port | Unusual congestion — possible port delays |
-| Stable counts across all straits | Normal global shipping conditions |
+**Speed distribution histogram**: Shows how fast moving vessels are travelling. A large spike in the "Slow" range at a specific strait or port = congestion. Normal distribution centered around 8–12 knots = healthy traffic flow.
 
-A downward trend at a high-risk strait often appears **2–7 days before official news** confirms a disruption. This is one of the earliest warning signals available anywhere.
+**Strait Vessel Traffic Trends** (below the map):
+Daily vessel counts per strait over time. This is one of the most powerful early-warning signals available:
+
+| Pattern | What it means |
+|---------|---------------|
+| Count dropping at Hormuz | Ships avoiding Persian Gulf — potential early disruption signal |
+| Tanker count drops, cargo stays normal | Energy-specific threat, not a general disruption |
+| Count rising sharply | Unusual congestion — possible port or strait delays |
+| All counts stable | Normal global shipping |
+
+A drop in vessel count at a critical strait often appears **2–7 days before official news confirms** a disruption.
+
+> **Coverage note:** AIS signals require land-based receivers within ~40–50 nautical miles. The Persian Gulf, Red Sea, and Arabian Sea are not covered by AISStream's free tier infrastructure. Satellite AIS providers (e.g., Spire Maritime) would be required for those regions.
 
 ---
 
 ### 🔗 8. Cross-Source Insights
-**What happens when you combine all 4 data sources?**
+**What happens when you combine all 4 data sources together?**
 
-This page has 4 tabs:
+**📦 Commodity Freight Cost tab:**
+For each commodity, how does freight cost (BDI proxy) compare to trade value?
+- High ratio = shipping costs eating into profit margins
+- **Cereals (HS 10) and Ores (HS 26)** are most sensitive — cheap bulk cargo, so freight is a large % of value
+- **Mineral fuels (HS 27)** are least sensitive — oil is so valuable that freight is a small % even when expensive
 
-**📦 Commodity Freight Cost**
-For each of the 5 commodities, how does the freight cost (BDI) compare to the trade value?
-- High ratio = freight is eating into profits for this commodity
-- Cereals and ores are most sensitive (cheap cargo, expensive to ship)
-- Mineral fuels (oil) are least sensitive (high value, so freight is a small %)
+**🇨🇳 China Concentration tab:**
+What % of each commodity's global exports does China control?
+- High China % + disrupted Chinese ports = immediate global supply chain impact
+- This is why Shanghai and Shenzhen weather matters for the whole world
 
-**🇨🇳 China Concentration**
-How much does China dominate each commodity?
-- High China share + disrupted Chinese ports = global supply risk
-- This is why Shanghai weather matters globally
+**📅 Booking Calendar tab:**
+Based on 10 years of BDI data — when is the cheapest time to book cargo?
+- 🟢 Green months = historically cheap (book here if possible)
+- 🟠 Orange months = historically expensive (avoid if possible)
+- Pattern: cheapest Jan–Mar, most expensive Sep–Nov
 
-**📅 Booking Calendar**
-Based on 10 years of BDI history — when is the cheapest time to book cargo?
-- Green months = historically cheap (book here)
-- Orange months = historically expensive (avoid if possible)
-
-**📊 All Analytical Tables**
-Technical view of all 12 analytical tables with row counts and source descriptions. Useful for understanding what data powers each chart.
+**📊 All Analytical Tables tab:**
+Technical view of all 12 analytical tables with descriptions. For data analysts.
 
 ---
 
-## Quick Reference — What to check when you open the app
+## Quick Reference — 3-step morning check
 
-**Every morning, do this 3-step check:**
+**Every morning:**
+1. **Executive Summary** → Any 🔴 disrupted routes? BDI signal BULLISH?
+2. **Strait Monitor** → Any straits above 60/100 (critical)?
+3. **Vessel Activity** → Is vessel count at key straits dropping?
 
-1. **Executive Summary** → Are any routes DISRUPTED? Is BDI signal BULLISH?
-2. **Strait Monitor** → Which straits are above 40/100 score?
-3. **Vessel Activity** → Is vessel traffic normal at high-risk straits?
+**If BDI is BULLISH** → Go to Baltic Dry Index → Consider locking in freight contracts
 
-**If BDI is BULLISH:**
-→ Go to Baltic Dry Index → Check if you need to lock in freight contracts now
+**If a route is DISRUPTED** → Go to Route Disruption → Check which commodities affected and alternate routes
 
-**If a route is DISRUPTED:**
-→ Go to Route Disruption → See which commodities and alternate routes exist
-→ Go to Strait Monitor → See the specific chokepoint's score and weather
-
-**If a port shows weather alert:**
-→ Go to Port Risk → See if the port handles commodities in your supply chain
-→ Check Trade Exposure column for $B at risk
-
-**If vessel counts drop at a strait:**
-→ This is often the EARLIEST signal of disruption — ships are rerouting before news confirms it
+**If a port shows weather alert** → Go to Port Risk → See trade exposure in $B at risk
 
 ---
 
@@ -286,15 +321,19 @@ Technical view of all 12 analytical tables with row counts and source descriptio
 | Term | Plain language definition |
 |------|--------------------------|
 | **BDI** | Baltic Dry Index — daily price to rent a bulk cargo ship |
-| **Beaufort scale** | Wind strength scale 0–12. 7+ affects port operations |
+| **Beaufort scale** | Wind strength scale 0–12. 7+ (Near Gale, 14+ m/s) affects port crane operations |
+| **BULLISH** | Market signal: freight rates rising — lock in contracts now |
+| **BEARISH** | Market signal: freight rates falling — use spot market, wait for cheaper rates |
 | **Charter** | Renting a ship for a specific voyage or time period |
 | **Chokepoint** | A narrow waterway all ships must use — disrupting it affects global trade |
-| **HS code** | International product category code for trade statistics |
+| **Congestion** | Too many ships at a port — causes delays for all vessels waiting to berth |
+| **HS code** | Harmonized System — international product category code for trade statistics |
 | **Knot (kn)** | Ship speed unit. 1 knot = 1.85 km/h |
-| **MMSI** | Ship's unique ID number, like a license plate |
-| **Rerouting** | Ships going a longer alternative path to avoid a dangerous area |
-| **Spot market** | Booking a ship at today's price instead of a long-term contract |
-| **VLCC** | Very Large Crude Carrier — largest oil tanker type |
+| **MMSI** | Maritime Mobile Service Identity — a ship's unique ID number, like a license plate |
+| **Rerouting** | Ships taking a longer alternative path to avoid a dangerous or blocked area |
+| **Spot market** | Booking a ship at today's market price instead of a pre-agreed long-term rate |
+| **TEU** | Twenty-foot Equivalent Unit — standard container size, used to measure port volume |
+| **VLCC** | Very Large Crude Carrier — the largest type of oil tanker |
 
 ---
 
