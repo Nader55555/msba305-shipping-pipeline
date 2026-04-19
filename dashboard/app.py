@@ -166,7 +166,7 @@ def load_csv() -> dict:
 with st.sidebar:
     st.markdown('<div style="font-size:22px;font-weight:700;color:#e8f0f8;margin-bottom:2px;">⚓ Maritime Intel</div>', unsafe_allow_html=True)
     st.markdown('<div style="font-size:11px;color:#90c4e8;margin-bottom:4px;">MSBA 305 — Data Processing Framework</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size:10px;color:#8aacc8;margin-bottom:20px;">American University of Beirut<br>Dr. Ahmad El-Hajj | Spring 2025/2026</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:10px;color:#8aacc8;margin-bottom:20px;">American University of Beirut<br>Dr. Ahmad El-Hajj | Spring 2025/2026<br><span style="color:#4a7fa5;font-style:italic;">Academic project — for educational purposes only</span></div>', unsafe_allow_html=True)
 
     page = st.radio("Navigation", [
         "📊 Executive Summary",
@@ -288,6 +288,7 @@ if page == "📊 Executive Summary":
     today = datetime.now().strftime("%B %d, %Y")
     st.markdown(f'<div style="font-size:12px;color:#4a7fa5;margin-bottom:1rem;">📅 {today}</div>',
                 unsafe_allow_html=True)
+    st.info("🎓 This is an academic project developed for MSBA 305 — Data Processing Framework at the American University of Beirut. All data is from public sources. For educational purposes only.")
     st.caption("This dashboard combines 4 live data sources to give you a daily shipping intelligence briefing. Start here every morning: check disrupted routes first, then BDI signal, then port alerts.")
 
     # ── Row 1: Top KPIs ──
