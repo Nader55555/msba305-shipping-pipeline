@@ -97,23 +97,25 @@ def enrich_fuel(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def upload_to_bigquery(df: pd.DataFrame) -> None:
-    """Upload fuel data to BigQuery — WRITE_APPEND."""
-    try:
-        from google.cloud import bigquery
-        from google.oauth2 import service_account
-        creds  = service_account.Credentials.from_service_account_file(GCP_KEY)
+    """Upload fuel data to BigQuery — WRITE_TRUNCATE."""
+    import pathlib
+    from google.cloud import bigquery
+    from google.oauth2 import service_account
+    key_path = pathlib.Path(GCP_KEY)
+    if key_path.exists():
+        creds  = service_account.Credentials.from_service_account_file(str(key_path))
         client = bigquery.Client(project=BQ_PROJECT, credentials=creds)
-        table_ref = f"{BQ_PROJECT}.{BQ_DATASET}.{TABLE_NAME}"
-        job_config = bigquery.LoadJobConfig(
-            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            autodetect=True,
-        )
-        job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
-        job.result()
-        print(f"✓ Uploaded {len(df):,} rows to {table_ref}")
-    except Exception as e:
-        print(f"✗ BigQuery upload failed: {e}")
-        raise
+    else:
+        # Fall back to Application Default Credentials
+        client = bigquery.Client(project=BQ_PROJECT)
+    table_ref  = f"{BQ_PROJECT}.{BQ_DATASET}.{TABLE_NAME}"
+    job_config = bigquery.LoadJobConfig(
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        autodetect=True,
+    )
+    job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
+    job.result()
+    print(f"✓ Uploaded {len(df):,} rows to {table_ref}")
 
 
 def main():

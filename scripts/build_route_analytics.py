@@ -85,21 +85,23 @@ def upload_to_bq(df: pd.DataFrame, table_name: str) -> None:
     if df.empty:
         print(f"  ⚠ Skipping {table_name} — empty DataFrame")
         return
-    try:
-        from google.cloud import bigquery
-        from google.oauth2 import service_account
-        creds  = service_account.Credentials.from_service_account_file(GCP_KEY)
+    import pathlib
+    from google.cloud import bigquery
+    from google.oauth2 import service_account
+    key_path = pathlib.Path(GCP_KEY)
+    if key_path.exists():
+        creds  = service_account.Credentials.from_service_account_file(str(key_path))
         client = bigquery.Client(project=BQ_PROJECT, credentials=creds)
-        table_ref  = f"{BQ_PROJECT}.{BQ_DATASET}.{table_name}"
-        job_config = bigquery.LoadJobConfig(
-            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            autodetect=True,
-        )
-        job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
-        job.result()
-        print(f"  ✓ BigQuery: {table_name} ({len(df):,} rows)")
-    except Exception as e:
-        print(f"  ✗ BigQuery upload failed for {table_name}: {e}")
+    else:
+        client = bigquery.Client(project=BQ_PROJECT)
+    table_ref  = f"{BQ_PROJECT}.{BQ_DATASET}.{table_name}"
+    job_config = bigquery.LoadJobConfig(
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+        autodetect=True,
+    )
+    job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
+    job.result()
+    print(f"  ✓ BigQuery: {table_name} ({len(df):,} rows)")
 
 
 def main():
