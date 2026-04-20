@@ -2,16 +2,15 @@ name: Daily Maritime Data Update
 
 on:
   schedule:
-    - cron: '0 20 * * 1-5'  # weekdays 20:00 UTC (after market close)
-  workflow_dispatch:          # allow manual trigger from GitHub UI
+    - cron: '0 17 * * 1-5'  # weekdays 17:00 UTC = 20:00 Lebanon (UTC+3)
+  workflow_dispatch:
 
-# BDI is updated manually — see README for instructions.
-# AIS, Weather and analytical tables run automatically daily.
+# Automated: Weather, AIS, Fuel (EIA), News (NewsData.io), Route Analytics, Analytical tables
+# Manual: BDI (investing.com download) — see README
 
 jobs:
   update-maritime-data:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -27,8 +26,7 @@ jobs:
       - name: Set up GCP credentials
         run: printf '%s' '${{ secrets.GCP_KEY }}' > gcp_key.json
 
-      # Step 1: Weather + straits — fetch from OpenWeatherMap
-      - name: Fetch Port Weather and Strait Conditions, upload to BigQuery
+      - name: Fetch port weather and strait conditions
         env:
           WEATHER_API_KEY: ${{ secrets.WEATHER_API_KEY }}
           BQ_PROJECT:      ${{ secrets.BQ_PROJECT }}
@@ -36,18 +34,39 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
         run: python scripts/ingest_weather.py
 
-      # Step 2: AIS vessel tracking — 4-minute collection at 8 straits + 20 ports
-      - name: Collect AIS vessel positions, upload to BigQuery
+      - name: Collect AIS vessel positions
         env:
-          AISSTREAM_API_KEY:    ${{ secrets.AISSTREAM_API_KEY }}
+          AISSTREAM_API_KEY:   ${{ secrets.AISSTREAM_API_KEY }}
           AIS_COLLECT_SECONDS: "240"
           BQ_PROJECT:          ${{ secrets.BQ_PROJECT }}
           BQ_DATASET:          ${{ secrets.BQ_DATASET }}
           GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
         run: python scripts/ingest_ais.py
 
-      # Step 3: Rebuild all 12 analytical tables from fresh data
-      - name: Rebuild analytical tables and upload to BigQuery
+      - name: Fetch fuel prices from EIA API
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          BQ_PROJECT:  ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET:  ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/ingest_fuel.py
+
+      - name: Fetch shipping news from NewsData.io
+        env:
+          NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
+          BQ_PROJECT:       ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET:       ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/ingest_news.py
+
+      - name: Build route analytics and deviation alerts
+        env:
+          BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
+          BQ_DATASET: ${{ secrets.BQ_DATASET }}
+          GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
+        run: python scripts/build_route_analytics.py
+
+      - name: Rebuild all analytical tables
         env:
           BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
           BQ_DATASET: ${{ secrets.BQ_DATASET }}
