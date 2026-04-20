@@ -1,0 +1,65 @@
+routes:
+  - route_name: Asia-Europe via Suez
+    route_group: Asia-Europe
+    primary_chokepoints: [Strait of Malacca, Bab el-Mandeb, Suez Canal, Strait of Gibraltar]
+    alternative_route: Asia-Europe via Cape of Good Hope
+    baseline_distance_nm: 10500
+    baseline_duration_days: 28
+    extra_days_if_disrupted: 14
+    extra_cost_per_voyage_usd: 1000000
+    origin_regions: [East Asia, Southeast Asia]
+    destination_regions: [Mediterranean, Northern Europe]
+    watch_ports: [Singapore, Shanghai, Rotterdam, Hamburg, Antwerp]
+    key_commodities: [Containers, Iron & steel, Cereals]
+
+  - route_name: Strait of Hormuz
+    route_group: Gulf-Asia
+    primary_chokepoints: [Strait of Hormuz, Strait of Malacca]
+    alternative_route: None (no viable alternative for most tankers)
+    baseline_distance_nm: 6200
+    baseline_duration_days: 18
+    extra_days_if_disrupted: 7
+    extra_cost_per_voyage_usd: 300000
+    origin_regions: [Persian Gulf, Gulf of Oman]
+    destination_regions: [South Asia, East Asia, Europe]
+    watch_ports: [Dubai, Jebel Ali, Fujairah, Singapore]
+    key_commodities: [Mineral fuels, LNG, Crude oil]
+
+  - route_name: Black Sea
+    route_group: Black Sea
+    primary_chokepoints: [Bosphorus Strait]
+    alternative_route: Overland rail or alternative European ports
+    baseline_distance_nm: 2800
+    baseline_duration_days: 8
+    extra_days_if_disrupted: 0
+    extra_cost_per_voyage_usd: 0
+    origin_regions: [Black Sea ports, Ukraine, Russia]
+    destination_regions: [Mediterranean, Northern Europe]
+    watch_ports: []
+    key_commodities: [Cereals, Mineral fuels, Iron & steel]
+
+  - route_name: Trans-Pacific
+    route_group: Trans-Pacific
+    primary_chokepoints: []
+    alternative_route: Via Suez (adds 15 days)
+    baseline_distance_nm: 6500
+    baseline_duration_days: 20
+    extra_days_if_disrupted: 0
+    extra_cost_per_voyage_usd: 0
+    origin_regions: [East Asia, Southeast Asia]
+    destination_regions: [US West Coast, US East Coast]
+    watch_ports: [Shanghai, Los Angeles, Long Beach, New York]
+    key_commodities: [Containers, Iron & steel, Ships & boats]
+
+  - route_name: North Sea / Dover
+    route_group: Northern Europe
+    primary_chokepoints: [Strait of Dover]
+    alternative_route: North of Scotland (adds 3 days)
+    baseline_distance_nm: 900
+    baseline_duration_days: 3
+    extra_days_if_disrupted: 3
+    extra_cost_per_voyage_usd: 50000
+    origin_regions: [Northern Europe]
+    destination_regions: [Atlantic, Mediterranean]
+    watch_ports: [Rotterdam, Hamburg, Antwerp]
+    key_commodities: [Containers, Iron & steel]
