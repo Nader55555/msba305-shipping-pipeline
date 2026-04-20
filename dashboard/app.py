@@ -248,14 +248,20 @@ straits_raw = D.get("strait_conditions", pd.DataFrame())
 # Filter port_weather and strait_conditions to latest date
 # (WRITE_APPEND tables grow daily — we only want today's snapshot for KPIs)
 def latest_snapshot(df, date_col="fetch_date"):
+    """Filter df to rows from the most recent DATE only.
+    Uses .dt.date comparison to avoid time-of-day mismatch
+    (different ports fetched seconds apart within same day).
+    """
     if df.empty or date_col not in df.columns:
         return df
+    df = df.copy()
     df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
-    latest = df[date_col].max()
-    return df[df[date_col] == latest].copy()
+    latest_date = df[date_col].dt.date.max()
+    return df[df[date_col].dt.date == latest_date].copy()
 
 wx          = latest_snapshot(wx,          "fetch_date")
 straits_raw = latest_snapshot(straits_raw, "fetch_date")
+ais         = latest_snapshot(ais,         "fetch_date")
 
 # Parse types
 for df, col in [(bdi, "date")]:
@@ -304,8 +310,21 @@ if page == "🌐 Live Intelligence":
     h("Global vessel positions — live AIS snapshot")
     st.markdown('<p style="font-size:13px;color:#c8d8e8;">Every dot is a vessel captured in the daily AIS collection window. Hover for vessel name, speed, and destination.</p>', unsafe_allow_html=True)
 
-    # Filter to latest date only for the map
-    ais_latest = latest_snapshot(ais, "fetch_date") if not ais.empty else ais
+    # Filters for vessel map
+    live_f1, live_f2 = st.columns(2)
+    with live_f1:
+        live_cats = ["All"] + sorted(ais["vessel_category"].dropna().unique().tolist()) if not ais.empty and "vessel_category" in ais.columns else ["All"]
+        live_cat  = st.selectbox("Filter by vessel type", live_cats, key="live_cat")
+    with live_f2:
+        live_locs = ["All"] + sorted(ais["port_guess"].dropna().unique().tolist()) if not ais.empty and "port_guess" in ais.columns else ["All"]
+        live_loc  = st.selectbox("Filter by location", live_locs, key="live_loc")
+
+    ais_latest = ais.copy()
+    if live_cat != "All" and "vessel_category" in ais_latest.columns:
+        ais_latest = ais_latest[ais_latest["vessel_category"] == live_cat]
+    if live_loc != "All" and "port_guess" in ais_latest.columns:
+        ais_latest = ais_latest[ais_latest["port_guess"] == live_loc]
+
     pos = ais_latest.dropna(subset=["latitude","longitude"]) if not ais_latest.empty and "latitude" in ais_latest.columns else pd.DataFrame()
     if not pos.empty:
         CAT_COLOR = {"Tanker":C["coral"],"Cargo":C["blue"],"Tug / Support":C["amber"],
@@ -464,7 +483,7 @@ elif page == "📊 Executive Summary":
     today = datetime.now().strftime("%B %d, %Y")
     st.markdown(f'<div style="font-size:12px;color:#c8d8e8;margin-bottom:1rem;">📅 {today}</div>',
                 unsafe_allow_html=True)
-    st.markdown('<p style="font-size:13px;color:#c8d8e8;">This dashboard combines 4 live data sources to give you a daily shipping intelligence briefing. Start here every morning: check disrupted routes first, then BDI signal, then port alerts.</p>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:13px;color:#c8d8e8;">This dashboard combines 6 live data sources (UN Comtrade, BDI, OpenWeatherMap, AISStream, EIA fuel prices, NewsData.io) to give you a daily shipping intelligence briefing. Start here every morning: check disrupted routes first, then BDI signal, then port alerts.</p>', unsafe_allow_html=True)
 
     # ── Row 1: Top KPIs ──
     k1, k2, k3, k4, k5, k6 = st.columns(6)
@@ -484,6 +503,7 @@ elif page == "📊 Executive Summary":
         k4.metric("Total export value", f"${total_t:.1f}T", delta="All years, 5 HS codes")
     if not ais.empty and "mmsi" in ais.columns:
         k5.metric("Vessels tracked (AIS)", f"{ais['mmsi'].nunique():,}")
+        # ais is already filtered to latest_snapshot globally
     if not bdi.empty:
         sig_df = D.get("analysis_bdi_signals", pd.DataFrame())
         if not sig_df.empty and "market_signal" in sig_df.columns:
@@ -504,7 +524,7 @@ elif page == "📊 Executive Summary":
                 f'— Strait: <b>{row.get("strait","N/A")}</b> '
                 f'(score {row.get("strait_disruption_score",0)}) &nbsp;|&nbsp; '
                 f'Commodities: {row.get("commodities_affected","")}<br>'
-                f'<span style="font-size:11px;color:#8aacc8;">{notes}</span>'
+                f'<span style="font-size:11px;color:#c8d8e8;">{notes}</span>'
                 f'</div>',
                 unsafe_allow_html=True,
             )
@@ -555,7 +575,7 @@ elif page == "📊 Executive Summary":
                     f'<div class="alert-card alert-{cls}">'
                     f'<b>{row.get("strait_name","")}</b> &nbsp;·&nbsp; '
                     f'Score {sc}/100 &nbsp;·&nbsp; Bf{bf} &nbsp;·&nbsp; Geo risk: {geo}<br>'
-                    f'<span style="font-size:11px;color:#8aacc8;">'
+                    f'<span style="font-size:11px;color:#c8d8e8;">'
                     f'{"⚠ Critical risk — monitor for routing changes" if sc >= 60 else "⚡ Elevated risk — factor into shipping plans" if sc >= 40 else "ℹ Moderate conditions" if sc >= 20 else "✓ Normal operating conditions"}'
                     f'</span></div>',
                     unsafe_allow_html=True,
@@ -645,14 +665,14 @@ elif page == "🚧 Strait Monitor":
             <span>🚢 {trd}% of world seaborne trade</span>
             <span>🛢 {oil}% of world oil</span>
           </div>
-          <div style="margin-top:6px;font-size:11px;color:#8aacc8;">
+          <div style="margin-top:6px;font-size:11px;color:#c8d8e8;">
             <b>Connects:</b> {row.get("connects","")} &nbsp;·&nbsp;
             <b>Routes:</b> {row.get("key_routes","")}
           </div>
           <div style="margin-top:4px;font-size:11px;color:#c8a060;">
             {"⚠ Critical risk — significant disruption likely, consider rerouting" if score >= 60 else "⚡ Elevated risk — monitor closely and factor into routing decisions" if score >= 40 else "ℹ Moderate conditions — standard precautions apply" if score >= 20 else "✓ Normal operating conditions"}
           </div>
-          <div style="margin-top:4px;font-size:11px;color:#8aacc8;">
+          <div style="margin-top:4px;font-size:11px;color:#c8d8e8;">
             🔀 Reroute: {row.get("reroute_note","N/A") if "reroute_note" in row.index else "N/A"}
           </div>
         </div>""", unsafe_allow_html=True)
@@ -751,7 +771,7 @@ elif page == "🛳  Route Disruption":
         <div class="alert-card alert-{cls}">
           <div style="display:flex;justify-content:space-between;">
             <b style="font-size:14px;">{s} &nbsp; {row.get("route","")}</b>
-            <span style="font-size:12px;color:#8aacc8;">Strait score: {score}/100 · Geo: {geo}</span>
+            <span style="font-size:12px;color:#c8d8e8;">Strait score: {score}/100 · Geo: {geo}</span>
           </div>
           <div style="margin-top:6px;font-size:12px;display:flex;gap:20px;flex-wrap:wrap;">
             <span>🚧 Strait: <b>{row.get("strait","N/A")}</b></span>
@@ -759,9 +779,9 @@ elif page == "🛳  Route Disruption":
             <span>🔀 Alt: {alt}</span>
           </div>
           <div style="margin-top:4px;font-size:12px;">
-            <span style="color:#8aacc8;">Origin ports at risk: {origin_risk} &nbsp;·&nbsp; Destination: {dest_risk}</span>
+            <span style="color:#c8d8e8;">Origin ports at risk: {origin_risk} &nbsp;·&nbsp; Destination: {dest_risk}</span>
           </div>
-          <div style="margin-top:4px;font-size:11px;color:#8aacc8;">{
+          <div style="margin-top:4px;font-size:11px;color:#c8d8e8;">{
             "⚠ Critical — rerouting expected, significant cost and time impact" if int(row.get("strait_disruption_score",0) or 0) >= 60
             else "⚡ Elevated risk — factor into logistics planning" if int(row.get("strait_disruption_score",0) or 0) >= 40
             else "👁 Monitor — conditions above normal" if int(row.get("strait_disruption_score",0) or 0) >= 20
@@ -1062,6 +1082,8 @@ elif page == "🌦  Port Risk":
         alert_box("red", "Port weather data not available."); st.stop()
 
     prt = D.get("analysis_port_risk_trade", pd.DataFrame())
+    if not prt.empty and "fetch_date" in prt.columns:
+        prt = latest_snapshot(prt, "fetch_date")
     df  = prt if not prt.empty else wx.copy()
 
     for col in ["beaufort_number","wind_speed_ms","temp_c","humidity_pct","visibility_m","total_B"]:
@@ -1092,7 +1114,7 @@ elif page == "🌦  Port Risk":
 
     # ── KPIs ──
     k1,k2,k3,k4,k5 = st.columns(5)
-    k1.metric("Ports monitored", len(wx))
+    k1.metric("Ports monitored", len(wx.drop_duplicates("port_name")) if "port_name" in wx.columns else len(wx))
     risk_n = int(wx["port_risk_flag"].sum()) if "port_risk_flag" in wx.columns else 0
     k2.metric("At risk (Bf≥7)", risk_n)
     if "total_B" in prt.columns and not prt.empty:
@@ -1223,7 +1245,7 @@ elif page == "🛥  Vessel Activity":
             st.markdown(
                 f'<div class="alert-card alert-{cls}">'
                 f'<b>{row.get("port_name","")}</b> — {risk}<br>'
-                f'<span style="font-size:11px;color:#8aacc8;">'
+                f'<span style="font-size:11px;color:#c8d8e8;">'
                 f'Vessels: {row.get("vessel_count",0)} · Tankers: {row.get("tanker_count",0)} · '
                 f'Cargo: {row.get("cargo_count",0)} · '
                 f'Wind Bf{row.get("beaufort_number","?")}'
