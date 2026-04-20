@@ -1,13 +1,11 @@
 """
 scripts/build_route_analytics.py
-Joins AIS + fuel + weather + news + BDI to produce route-level analytics.
-Compares current vessel activity vs historical baseline per route.
+Reads from BigQuery (live data) — NOT from static CSV files.
 Run: python scripts/build_route_analytics.py
 """
 import os
 import pathlib
 import pandas as pd
-import yaml
 
 BQ_PROJECT = os.getenv("BQ_PROJECT", "msba305-shipping")
 BQ_DATASET = os.getenv("BQ_DATASET", "shipping_data")
@@ -15,227 +13,152 @@ GCP_KEY    = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "gcp_key.json")
 
 ROOT  = pathlib.Path(__file__).resolve().parents[1]
 CLEAN = ROOT / "data" / "clean"
-ROUTES_PATH = ROOT / "config" / "routes.yaml"
 
-# Port → route mapping
 PORT_TO_ROUTE = {
-    "Singapore":        "Asia-Europe via Suez",
-    "Shanghai":         "Asia-Europe via Suez",
-    "Shenzhen":         "Asia-Europe via Suez",
-    "Hong Kong":        "Asia-Europe via Suez",
-    "Busan":            "Asia-Europe via Suez",
-    "Rotterdam":        "Asia-Europe via Suez",
-    "Antwerp":          "Asia-Europe via Suez",
-    "Hamburg":          "North Sea / Dover",
-    "Strait of Dover":  "North Sea / Dover",
-    "Strait of Gibraltar": "Asia-Europe via Suez",
-    "Suez Canal":       "Asia-Europe via Suez",
-    "Bab el-Mandeb":    "Asia-Europe via Suez",
-    "Strait of Malacca":"Asia-Europe via Suez",
-    "Strait of Hormuz": "Strait of Hormuz",
-    "Dubai":            "Strait of Hormuz",
-    "Bosphorus Strait": "Black Sea",
-    "Los Angeles":      "Trans-Pacific",
-    "New York":         "Trans-Pacific",
+    "Singapore":"Asia-Europe via Suez","Shanghai":"Asia-Europe via Suez",
+    "Shenzhen":"Asia-Europe via Suez","Hong Kong":"Asia-Europe via Suez",
+    "Busan":"Asia-Europe via Suez","Rotterdam":"Asia-Europe via Suez",
+    "Antwerp":"Asia-Europe via Suez","Hamburg":"North Sea / Dover",
+    "Strait of Dover":"North Sea / Dover","Strait of Gibraltar":"Asia-Europe via Suez",
+    "Suez Canal":"Asia-Europe via Suez","Bab el-Mandeb":"Asia-Europe via Suez",
+    "Strait of Malacca":"Asia-Europe via Suez","Strait of Hormuz":"Strait of Hormuz",
+    "Dubai":"Strait of Hormuz","Bosphorus Strait":"Black Sea",
+    "Los Angeles":"Trans-Pacific","New York":"Trans-Pacific","Tokyo":"Trans-Pacific",
 }
+ALL_ROUTES = ["Asia-Europe via Suez","Strait of Hormuz","Black Sea","Trans-Pacific","North Sea / Dover"]
 
-STRAIT_TO_ROUTE = {
-    "Strait of Hormuz":    "Strait of Hormuz",
-    "Strait of Malacca":   "Asia-Europe via Suez",
-    "Suez Canal":          "Asia-Europe via Suez",
-    "Bab el-Mandeb":       "Asia-Europe via Suez",
-    "Bosphorus Strait":    "Black Sea",
-    "Strait of Dover":     "North Sea / Dover",
-    "Strait of Gibraltar": "Asia-Europe via Suez",
-    "Lombok Strait":       "Asia-Europe via Suez",
-}
-
-ALL_ROUTES = [
-    "Asia-Europe via Suez",
-    "Strait of Hormuz",
-    "Black Sea",
-    "Trans-Pacific",
-    "North Sea / Dover",
-    "Unmapped / Other",
-]
-
-
-def load(name):
-    path = CLEAN / name
-    return pd.read_csv(path, low_memory=False) if path.exists() else pd.DataFrame()
-
-
-def save(df, name):
-    out = CLEAN / name
-    df.to_csv(out, index=False)
-    print(f"  ✓ Saved {name}: {len(df):,} rows")
-
-
-def map_to_route(port_guess):
-    if not isinstance(port_guess, str):
-        return "Unmapped / Other"
-    for key, route in PORT_TO_ROUTE.items():
-        if key.lower() in port_guess.lower():
-            return route
-    return "Unmapped / Other"
-
-
-def upload_to_bq(df: pd.DataFrame, table_name: str) -> None:
-    """Upload DataFrame to BigQuery — WRITE_TRUNCATE."""
-    if df.empty:
-        print(f"  ⚠ Skipping {table_name} — empty DataFrame")
-        return
-    import pathlib
+def get_client():
     from google.cloud import bigquery
     from google.oauth2 import service_account
-    key_path = pathlib.Path(GCP_KEY)
-    if key_path.exists():
-        creds  = service_account.Credentials.from_service_account_file(str(key_path))
-        client = bigquery.Client(project=BQ_PROJECT, credentials=creds)
-    else:
-        client = bigquery.Client(project=BQ_PROJECT)
-    table_ref  = f"{BQ_PROJECT}.{BQ_DATASET}.{table_name}"
-    job_config = bigquery.LoadJobConfig(
-        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-        autodetect=True,
-    )
-    job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
-    job.result()
-    print(f"  ✓ BigQuery: {table_name} ({len(df):,} rows)")
+    kp = pathlib.Path(GCP_KEY)
+    if kp.exists():
+        creds = service_account.Credentials.from_service_account_file(str(kp))
+        return bigquery.Client(project=BQ_PROJECT, credentials=creds)
+    return bigquery.Client(project=BQ_PROJECT)
 
+def read_bq(table, client):
+    try:
+        df = client.query(f"SELECT * FROM `{BQ_PROJECT}.{BQ_DATASET}.{table}`").to_dataframe()
+        df.columns = [c.lower() for c in df.columns]
+        print(f"  ✓ {table}: {len(df):,} rows")
+        return df
+    except Exception as e:
+        print(f"  ⚠ {table}: {e}")
+        return pd.DataFrame()
+
+def upload(df, name, client):
+    if df.empty:
+        print(f"  ⚠ Skip {name} — empty"); return
+    from google.cloud import bigquery
+    jc = bigquery.LoadJobConfig(write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE, autodetect=True)
+    client.load_table_from_dataframe(df, f"{BQ_PROJECT}.{BQ_DATASET}.{name}", job_config=jc).result()
+    df.to_csv(CLEAN / f"{name}.csv", index=False)
+    print(f"  ✓ {name}: {len(df):,} rows → BigQuery + CSV")
+
+def map_route(pg):
+    if not isinstance(pg, str): return "Unmapped / Other"
+    for k, v in PORT_TO_ROUTE.items():
+        if k.lower() in pg.lower(): return v
+    return "Unmapped / Other"
 
 def main():
     print("\n=== BUILD ROUTE ANALYTICS ===")
+    try:
+        client = get_client()
+    except Exception as e:
+        print(f"✗ BQ connection failed: {e}"); return
 
-    # ── LOAD ALL SOURCES ──────────────────────────────────────────────────────
-    ais     = load("aisstream_clean.csv")
-    fuel    = load("fuel_prices_daily.csv")
-    news    = load("shipping_news.csv")
-    bdi     = load("bdi_clean.csv")
-    weather = load("port_weather_clean.csv")
+    ais  = read_bq("vessel_movements",  client)
+    fuel = read_bq("fuel_prices_daily", client)
+    news = read_bq("shipping_news",     client)
 
-    # ── 1. TAG AIS WITH ROUTE ─────────────────────────────────────────────────
-    if not ais.empty and "port_guess" in ais.columns:
-        ais["route"] = ais["port_guess"].apply(map_to_route)
-        ais["fetch_date"] = pd.to_datetime(ais.get("fetch_date", pd.Timestamp.now()), errors="coerce")
+    if ais.empty:
+        print("⚠ No AIS data — cannot build analytics"); return
 
-    # ── 2. ROUTE BASELINES (historical averages per route) ────────────────────
+    if "port_guess" in ais.columns:
+        ais["route"] = ais["port_guess"].apply(map_route)
+    if "fetch_date" in ais.columns:
+        ais["fetch_date"] = pd.to_datetime(ais["fetch_date"], errors="coerce")
+    if "sog_knots" in ais.columns:
+        ais["sog_knots"] = pd.to_numeric(ais["sog_knots"], errors="coerce")
+
+    # Baselines
     baselines = []
-    if not ais.empty and "route" in ais.columns:
-        hist = ais.groupby(["route", "fetch_date"]).agg(
-            daily_vessels=("mmsi", "nunique"),
-            avg_speed=("sog_knots", "mean"),
-            tanker_count=("vessel_category", lambda x: (x == "Tanker").sum()),
-            cargo_count=("vessel_category", lambda x: (x == "Cargo").sum()),
-        ).reset_index()
+    if "fetch_date" in ais.columns and "route" in ais.columns:
+        hist = (ais.groupby(["route", ais["fetch_date"].dt.date])
+                .agg(daily_vessels=("mmsi","nunique"),
+                     avg_speed=("sog_knots","mean"),
+                     tanker_count=("vessel_category", lambda x: (x=="Tanker").sum()),
+                     cargo_count=("vessel_category", lambda x: (x=="Cargo").sum()))
+                .reset_index())
+        for r in ALL_ROUTES:
+            sub = hist[hist["route"]==r]
+            baselines.append({"route":r,
+                "baseline_avg_vessels":round(sub["daily_vessels"].mean(),1) if not sub.empty else 0,
+                "baseline_avg_speed":round(sub["avg_speed"].mean(),2) if not sub.empty else 0,
+                "days_of_history":len(sub) if not sub.empty else 0})
+    bl_df = pd.DataFrame(baselines)
+    upload(bl_df, "route_baselines", client)
 
-        for route in ALL_ROUTES:
-            sub = hist[hist["route"] == route]
-            baselines.append({
-                "route":                    route,
-                "baseline_avg_vessels":     round(sub["daily_vessels"].mean(), 1) if not sub.empty else 0,
-                "baseline_avg_speed":       round(sub["avg_speed"].mean(), 2)     if not sub.empty else 0,
-                "baseline_tanker_count":    round(sub["tanker_count"].mean(), 1)  if not sub.empty else 0,
-                "baseline_cargo_count":     round(sub["cargo_count"].mean(), 1)   if not sub.empty else 0,
-                "days_of_history":          len(sub["fetch_date"].unique())        if not sub.empty else 0,
-            })
-    baseline_df = pd.DataFrame(baselines)
-    save(baseline_df, "route_baselines.csv")
-    upload_to_bq(baseline_df, "route_baselines")
+    # Current vs historical
+    rows = []
+    if "fetch_date" in ais.columns and "route" in ais.columns:
+        latest = ais["fetch_date"].dt.date.max()
+        la = ais[ais["fetch_date"].dt.date == latest]
 
-    # ── 3. CURRENT VS HISTORICAL (latest day per route) ───────────────────────
-    current_rows = []
-    if not ais.empty and "route" in ais.columns:
-        latest_date = ais["fetch_date"].max()
-        latest_ais  = ais[ais["fetch_date"] == latest_date]
+        fuel_pressure, fuel_signal = 0.0, "NORMAL"
+        if not fuel.empty and "fuel_pressure_score" in fuel.columns:
+            fuel["date"] = pd.to_datetime(fuel["date"], errors="coerce")
+            lf = fuel.sort_values("date").iloc[-1]
+            fuel_pressure = float(lf.get("fuel_pressure_score",0) or 0)
+            fuel_signal   = str(lf.get("fuel_signal","NORMAL"))
 
-        for route in ALL_ROUTES:
-            sub = latest_ais[latest_ais["route"] == route]
-            bl  = baseline_df[baseline_df["route"] == route]
-            bl_vessels = float(bl["baseline_avg_vessels"].iloc[0]) if not bl.empty else 0
-            bl_speed   = float(bl["baseline_avg_speed"].iloc[0])   if not bl.empty else 0
+        for r in ALL_ROUTES:
+            sub = la[la["route"]==r]
+            bl  = bl_df[bl_df["route"]==r]
+            bl_v = float(bl["baseline_avg_vessels"].iloc[0]) if not bl.empty else 0
+            bl_s = float(bl["baseline_avg_speed"].iloc[0])   if not bl.empty else 0
+            cv = int(sub["mmsi"].nunique()) if not sub.empty else 0
+            cs = float(sub["sog_knots"].dropna().mean()) if not sub.empty and sub["sog_knots"].notna().any() else 0
+            ct = int((sub["vessel_category"]=="Tanker").sum()) if not sub.empty and "vessel_category" in sub.columns else 0
 
-            cur_vessels = sub["mmsi"].nunique() if not sub.empty else 0
-            cur_speed   = float(sub["sog_knots"].mean()) if not sub.empty and "sog_knots" in sub.columns else 0
-            cur_tankers = int((sub["vessel_category"] == "Tanker").sum()) if not sub.empty else 0
+            nr, nc = 0.0, 0
+            if not news.empty and "relevant_routes" in news.columns and "risk_score" in news.columns:
+                rn = news[news["relevant_routes"].str.contains(r.split(" ")[0], na=False, case=False)]
+                if not rn.empty:
+                    nr = float(rn["risk_score"].max())
+                    nc = len(rn)
 
-            # Fuel pressure today
-            fuel_pressure = 0
-            fuel_signal   = "NORMAL"
-            if not fuel.empty and "fuel_pressure_score" in fuel.columns:
-                fuel["date"] = pd.to_datetime(fuel["date"], errors="coerce")
-                latest_fuel  = fuel.sort_values("date").iloc[-1]
-                fuel_pressure = float(latest_fuel["fuel_pressure_score"])
-                fuel_signal   = str(latest_fuel.get("fuel_signal", "NORMAL"))
+            tg = ((cv - bl_v) / max(bl_v, 1)) * 100
+            sg = cs - bl_s
+            impact = round(max(0,-tg*0.4) + max(0,-sg*5) + fuel_pressure*0.3 + nr*0.3, 1)
 
-            # News risk for this route
-            news_risk = 0
-            news_count = 0
-            if not news.empty and "relevant_routes" in news.columns:
-                route_news = news[news["relevant_routes"].str.contains(route.split(" ")[0], na=False, case=False)]
-                if not route_news.empty:
-                    news_risk  = float(route_news["risk_score"].max())
-                    news_count = len(route_news)
+            rows.append({"event_date":str(latest),"route":r,
+                "current_vessels":cv,"current_avg_speed":round(cs,2),"current_tankers":ct,
+                "baseline_avg_vessels":round(bl_v,1),"baseline_avg_speed":round(bl_s,2),
+                "traffic_vs_history_pct":round(tg,1),"speed_gap_knots":round(sg,2),
+                "fuel_pressure_score":round(fuel_pressure,2),"fuel_signal":fuel_signal,
+                "news_risk_score":round(nr,1),"news_article_count":nc,
+                "route_impact_score":impact,
+                "status":"CRITICAL" if impact>=60 else "ELEVATED" if impact>=30 else "NORMAL"})
 
-            # Composite impact score
-            traffic_gap  = ((cur_vessels - bl_vessels) / max(bl_vessels, 1)) * 100
-            speed_gap    = cur_speed - bl_speed
-            impact_score = round(
-                max(0, -traffic_gap * 0.4) +   # traffic drop → pressure
-                max(0, -speed_gap * 5) +         # speed drop → congestion
-                fuel_pressure * 0.3 +            # fuel cost pressure
-                news_risk * 0.3,                 # news risk signal
-                1
-            )
+    cur_df = pd.DataFrame(rows)
+    upload(cur_df, "analysis_current_vs_historical", client)
 
-            current_rows.append({
-                "event_date":              str(latest_date.date() if hasattr(latest_date, "date") else latest_date),
-                "route":                   route,
-                "current_vessels":         cur_vessels,
-                "current_avg_speed":       round(cur_speed, 2),
-                "current_tankers":         cur_tankers,
-                "baseline_avg_vessels":    round(bl_vessels, 1),
-                "baseline_avg_speed":      round(bl_speed, 2),
-                "traffic_vs_history_pct":  round(traffic_gap, 1),
-                "speed_gap_knots":         round(speed_gap, 2),
-                "fuel_pressure_score":     round(fuel_pressure, 2),
-                "fuel_signal":             fuel_signal,
-                "news_risk_score":         round(news_risk, 1),
-                "news_article_count":      news_count,
-                "route_impact_score":      impact_score,
-                "status":                  (
-                    "CRITICAL" if impact_score >= 60 else
-                    "ELEVATED" if impact_score >= 30 else
-                    "NORMAL"
-                ),
-            })
-
-    current_df = pd.DataFrame(current_rows)
-    save(current_df, "analysis_current_vs_historical.csv")
-    upload_to_bq(current_df, "analysis_current_vs_historical")
-
-    # ── 4. DEVIATION ALERTS ───────────────────────────────────────────────────
-    if not current_df.empty:
-        alerts = current_df[
-            (current_df["traffic_vs_history_pct"] < -20) |   # >20% traffic drop
-            (current_df["speed_gap_knots"] < -2) |            # >2 knot speed drop
-            (current_df["news_risk_score"] >= 70) |           # high news risk
-            (current_df["fuel_pressure_score"] > 10)          # fuel spike
-        ].copy()
-        alerts["deviation_flag"] = True
-        alerts["deviation_reason"] = alerts.apply(lambda r:
-            "Traffic drop" if r["traffic_vs_history_pct"] < -20 else
-            "Speed drop"   if r["speed_gap_knots"] < -2 else
-            "News risk"    if r["news_risk_score"] >= 70 else
-            "Fuel spike",  axis=1
-        )
-        save(alerts, "route_deviation_alerts.csv")
-        upload_to_bq(alerts, "route_deviation_alerts")
-    else:
-        save(pd.DataFrame(), "route_deviation_alerts.csv")
+    if not cur_df.empty:
+        al = cur_df[(cur_df["traffic_vs_history_pct"]<-20)|(cur_df["speed_gap_knots"]<-2)|
+                    (cur_df["news_risk_score"]>=70)|(cur_df["fuel_pressure_score"]>10)].copy()
+        if not al.empty:
+            al["deviation_flag"] = True
+            al["deviation_reason"] = al.apply(lambda r2:
+                "Traffic drop" if r2["traffic_vs_history_pct"]<-20 else
+                "Speed drop"   if r2["speed_gap_knots"]<-2 else
+                "News risk"    if r2["news_risk_score"]>=70 else "Fuel spike", axis=1)
+            upload(al, "route_deviation_alerts", client)
+        else:
+            print("  ✓ No deviation alerts today")
 
     print("=== ROUTE ANALYTICS COMPLETE ===\n")
-
 
 if __name__ == "__main__":
     main()
