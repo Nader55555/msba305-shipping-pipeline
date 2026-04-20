@@ -166,7 +166,7 @@ def load_csv() -> dict:
 with st.sidebar:
     st.markdown('<div style="font-size:22px;font-weight:700;color:#e8f0f8;margin-bottom:2px;">⚓ Maritime Intel</div>', unsafe_allow_html=True)
     st.markdown('<div style="font-size:11px;color:#90c4e8;margin-bottom:4px;">MSBA 305 — Data Processing Framework</div>', unsafe_allow_html=True)
-    st.markdown('<div style="font-size:10px;color:#8aacc8;margin-bottom:20px;">American University of Beirut<br>Dr. Ahmad El-Hajj | Spring 2025/2026<br><span style="color:#4a7fa5;font-style:italic;">Academic project ----- for educational purposes only</span></div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:10px;color:#8aacc8;margin-bottom:20px;">American University of Beirut<br>Dr. Ahmad El-Hajj | Spring 2025/2026<br><span style="color:#4a7fa5;font-style:italic;">Academic project — for educational purposes only</span></div>', unsafe_allow_html=True)
 
     page = st.radio("Navigation", [
         "📊 Executive Summary",
@@ -681,9 +681,9 @@ elif page == "📈 Baltic Dry Index":
     fig.update_layout(**DARK, title="Baltic Dry Index", title_font=dict(color="white"), legend_font=dict(color="white"),height=380, hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
-    # ── Signals chart (collapsed — supplements main chart) ──
+    # ── Signals chart (expander) ──
     if not sig_df.empty and "market_signal" in sig_df.columns:
-        with st.expander("📊 Market signals timeline — BDI coloured by signal type", expanded=False):
+        with st.expander("📊 Market signals timeline — click to expand", expanded=False):
             sig_yr = sig_df[(sig_df["date"].dt.year >= yr_r[0]) & (sig_df["date"].dt.year <= yr_r[1])].copy()
             signal_colors = {"BULLISH": C["teal"], "BEARISH": C["coral"], "OVERBOUGHT": C["amber"],
                              "OVERSOLD": C["purple"], "NEUTRAL": C["gray"]}
@@ -856,10 +856,10 @@ elif page == "🌍 Trade Analysis":
                                   "bdi_yoy_pct","trade_yoy_pct","correlation_signal"]],
                              use_container_width=True)
 
-    # ── YoY heatmap (in expander — detailed, not needed at first glance) ──
+    # ── YoY heatmap (expander) ──
     if "yoy_growth_pct" in dft.columns and "flow_direction" in dft.columns:
         with st.expander("📊 Year-on-year export growth % — top 20 countries", expanded=False):
-            st.caption("Green = export growth that year. Red = export decline. NaN = no data submitted to UN Comtrade.")
+            st.caption("Green = export growth. Red = export decline. NaN = no data submitted to UN Comtrade.")
             yoy = (dft[dft["flow_direction"]=="Export"]
                    .groupby(["reporter_country","year"])["yoy_growth_pct"].mean().reset_index())
             top20 = (dft[dft["flow_direction"]=="Export"]
@@ -988,7 +988,7 @@ elif page == "🌦  Port Risk":
                                margin=dict(t=10,b=40,l=60,r=10)))
             st.plotly_chart(fig2, use_container_width=True)
 
-    # ── Net exporter risk table → expander ──
+    # ── Net exporter risk table (expander) ──
     ner = D.get("analysis_net_exporter_risk", pd.DataFrame())
     if not ner.empty:
         with st.expander("📋 Net exporters ranked by value + current weather impact", expanded=False):
@@ -1131,7 +1131,7 @@ elif page == "🛥  Vessel Activity":
                                margin=dict(t=10,b=50,l=30,r=10), xaxis_tickangle=-30))
             st.plotly_chart(fig3, use_container_width=True)
 
-    # ── Top destinations + speed histogram → expander ──────────────────
+    # ── Destinations + histogram → side-by-side expander ────────────────
     with st.expander("🔍 Vessel destinations & speed distribution", expanded=False):
         dc1, dc2 = st.columns(2)
         with dc1:
@@ -1175,6 +1175,97 @@ elif page == "🛥  Vessel Activity":
                                                     margin=dict(t=10,b=50,l=50,r=20)))
                     st.plotly_chart(fig_spd, use_container_width=True)
 
+
+
+    # ── Historical vessel comparison ──────────────────────────────────────
+    h("Historical vessel activity — daily trends")
+    st.caption("Compare vessel counts and types across all collection dates. A drop in vessel count at a high-risk strait is often the earliest disruption signal.")
+
+    if not ais.empty and "fetch_date" in ais.columns:
+        ais_hist = ais.copy()
+        ais_hist["fetch_date"] = pd.to_datetime(ais_hist["fetch_date"], errors="coerce")
+        hist_dates = ais_hist["fetch_date"].dropna().unique()
+
+        if len(hist_dates) > 1:
+            hc1, hc2 = st.columns(2)
+            with hc1:
+                h("Daily unique vessel count")
+                daily_total = (ais_hist.groupby("fetch_date")["mmsi"]
+                               .nunique().reset_index()
+                               .rename(columns={"mmsi":"vessels"})
+                               .sort_values("fetch_date"))
+                fig_hist = go.Figure()
+                fig_hist.add_trace(go.Scatter(
+                    x=daily_total["fetch_date"], y=daily_total["vessels"],
+                    mode="lines+markers", name="All vessels",
+                    line=dict(color=C["blue"], width=2), marker=dict(size=7),
+                    hovertemplate="Date: %{x}<br>Vessels: %{y}<extra></extra>",
+                ))
+                fig_hist.add_hline(
+                    y=daily_total["vessels"].mean(),
+                    line_dash="dash", line_color=C["amber"],
+                    annotation_text=f"Avg: {daily_total['vessels'].mean():.0f}",
+                    annotation_font_color=C["amber"],
+                )
+                fig_hist.update_layout(**layout(height=260, hovermode="x unified",
+                    xaxis_title="Date", yaxis_title="Unique vessels",
+                    margin=dict(t=10,b=50,l=50,r=20)))
+                st.plotly_chart(fig_hist, use_container_width=True)
+
+            with hc2:
+                h("Daily vessels by type")
+                if "vessel_category" in ais_hist.columns:
+                    daily_cat = (ais_hist[ais_hist["vessel_category"].isin(["Cargo","Tanker","Passenger","Fishing"])]
+                                 .groupby(["fetch_date","vessel_category"])["mmsi"]
+                                 .nunique().reset_index()
+                                 .rename(columns={"mmsi":"count"})
+                                 .sort_values("fetch_date"))
+                    fig_cat = go.Figure()
+                    for cat, col in [("Cargo",C["blue"]),("Tanker",C["coral"]),
+                                     ("Passenger",C["purple"]),("Fishing",C["teal"])]:
+                        sub = daily_cat[daily_cat["vessel_category"]==cat]
+                        if not sub.empty:
+                            fig_cat.add_trace(go.Scatter(
+                                x=sub["fetch_date"], y=sub["count"],
+                                name=cat, mode="lines+markers",
+                                line=dict(color=col, width=2), marker=dict(size=5),
+                            ))
+                    fig_cat.update_layout(**layout(height=260, hovermode="x unified",
+                        xaxis_title="Date", yaxis_title="Count",
+                        margin=dict(t=10,b=50,l=50,r=20)))
+                    st.plotly_chart(fig_cat, use_container_width=True)
+
+            # Average speed trend
+            if "sog_knots" in ais_hist.columns:
+                h("Average vessel speed over time (moving vessels only)")
+                st.caption("A drop in average speed = more vessels are slow or stationary = possible congestion.")
+                daily_spd = (ais_hist[ais_hist["sog_knots"].fillna(0) > 0.5]
+                             .groupby("fetch_date")["sog_knots"]
+                             .mean().reset_index()
+                             .rename(columns={"sog_knots":"avg_speed"})
+                             .sort_values("fetch_date"))
+                if not daily_spd.empty:
+                    fig_spd2 = go.Figure()
+                    fig_spd2.add_trace(go.Scatter(
+                        x=daily_spd["fetch_date"], y=daily_spd["avg_speed"].round(2),
+                        mode="lines+markers", name="Avg speed",
+                        line=dict(color=C["teal"], width=2), marker=dict(size=6),
+                        fill="tozeroy", fillcolor="rgba(29,158,117,0.08)",
+                    ))
+                    fig_spd2.add_hline(
+                        y=daily_spd["avg_speed"].mean(),
+                        line_dash="dash", line_color=C["amber"],
+                        annotation_text=f"Avg: {daily_spd['avg_speed'].mean():.1f} kn",
+                        annotation_font_color=C["amber"],
+                    )
+                    fig_spd2.update_layout(**layout(height=220, hovermode="x unified",
+                        xaxis_title="Date", yaxis_title="Avg speed (kn)",
+                        margin=dict(t=10,b=50,l=50,r=20)))
+                    st.plotly_chart(fig_spd2, use_container_width=True)
+        else:
+            alert_box("blue", "Historical comparison requires 2+ daily AIS runs. Currently only 1 date in the dataset — check back tomorrow.")
+    else:
+        alert_box("blue", "AIS data not available.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 8 — CROSS-SOURCE INSIGHTS
@@ -1348,107 +1439,6 @@ elif page == "🔗 Cross-Source Insights":
 
 
     # ── Strait vessel traffic trends ──
-    # ── Historical vessel comparison ──────────────────────────────────────
-    h("Historical vessel activity — daily trends")
-    st.caption("Compare vessel counts, types, and speeds across all collection dates. A drop in vessel count at a high-risk strait is an early disruption signal.")
-
-    if not ais.empty and "fetch_date" in ais.columns:
-        ais["fetch_date"] = pd.to_datetime(ais["fetch_date"], errors="coerce")
-        hist_dates = ais["fetch_date"].dropna().unique()
-
-        if len(hist_dates) > 1:
-            hc1, hc2 = st.columns(2)
-            with hc1:
-                # Daily unique vessel count over time
-                daily_total = (ais.groupby("fetch_date")["mmsi"]
-                               .nunique().reset_index()
-                               .rename(columns={"mmsi":"unique_vessels"})
-                               .sort_values("fetch_date"))
-                fig_hist = go.Figure()
-                fig_hist.add_trace(go.Scatter(
-                    x=daily_total["fetch_date"], y=daily_total["unique_vessels"],
-                    mode="lines+markers", name="All vessels",
-                    line=dict(color=C["blue"], width=2),
-                    marker=dict(size=6),
-                    hovertemplate="Date: %{x}<br>Vessels: %{y}<extra></extra>",
-                ))
-                fig_hist.update_layout(**layout(
-                    height=280, hovermode="x unified",
-                    xaxis_title="Date", yaxis_title="Unique vessels",
-                    margin=dict(t=10, b=50, l=50, r=20),
-                ))
-                fig_hist.add_hline(
-                    y=daily_total["unique_vessels"].mean(),
-                    line_dash="dash", line_color=C["amber"],
-                    annotation_text=f"Avg: {daily_total['unique_vessels'].mean():.0f}",
-                    annotation_font_color=C["amber"],
-                )
-                h("Daily unique vessel count over time")
-                st.plotly_chart(fig_hist, use_container_width=True)
-
-            with hc2:
-                # Daily vessel count by category
-                if "vessel_category" in ais.columns:
-                    daily_cat = (ais[ais["vessel_category"].isin(["Cargo","Tanker","Passenger","Fishing"])]
-                                 .groupby(["fetch_date","vessel_category"])["mmsi"]
-                                 .nunique().reset_index()
-                                 .rename(columns={"mmsi":"count"})
-                                 .sort_values("fetch_date"))
-                    fig_cat = go.Figure()
-                    cat_colors = {"Cargo":C["blue"],"Tanker":C["coral"],"Passenger":C["purple"],"Fishing":C["teal"]}
-                    for cat in ["Cargo","Tanker","Passenger","Fishing"]:
-                        sub = daily_cat[daily_cat["vessel_category"]==cat]
-                        if not sub.empty:
-                            fig_cat.add_trace(go.Scatter(
-                                x=sub["fetch_date"], y=sub["count"],
-                                name=cat, mode="lines+markers",
-                                line=dict(color=cat_colors.get(cat,C["gray"]), width=2),
-                                marker=dict(size=5),
-                            ))
-                    fig_cat.update_layout(**layout(
-                        height=280, hovermode="x unified",
-                        xaxis_title="Date", yaxis_title="Vessel count",
-                        margin=dict(t=10, b=50, l=50, r=20),
-                    ))
-                    h("Daily vessels by type")
-                    st.plotly_chart(fig_cat, use_container_width=True)
-
-            # Average speed trend over time
-            if "sog_knots" in ais.columns:
-                daily_spd = (ais[ais["sog_knots"] > 0.5]
-                             .groupby("fetch_date")["sog_knots"]
-                             .mean().reset_index()
-                             .rename(columns={"sog_knots":"avg_speed"})
-                             .sort_values("fetch_date"))
-                if not daily_spd.empty:
-                    h("Average vessel speed over time (moving vessels only)")
-                    st.caption("A drop in average speed = more vessels are slow or stationary = possible congestion.")
-                    fig_spd2 = go.Figure()
-                    fig_spd2.add_trace(go.Scatter(
-                        x=daily_spd["fetch_date"], y=daily_spd["avg_speed"].round(2),
-                        mode="lines+markers", name="Avg speed",
-                        line=dict(color=C["teal"], width=2),
-                        marker=dict(size=6),
-                        fill="tozeroy", fillcolor="rgba(29,158,117,0.08)",
-                        hovertemplate="Date: %{x}<br>Avg speed: %{y:.1f} kn<extra></extra>",
-                    ))
-                    fig_spd2.add_hline(
-                        y=daily_spd["avg_speed"].mean(),
-                        line_dash="dash", line_color=C["amber"],
-                        annotation_text=f"Avg: {daily_spd['avg_speed'].mean():.1f} kn",
-                        annotation_font_color=C["amber"],
-                    )
-                    fig_spd2.update_layout(**layout(
-                        height=220, hovermode="x unified",
-                        xaxis_title="Date", yaxis_title="Avg speed (kn)",
-                        margin=dict(t=10, b=50, l=50, r=20),
-                    ))
-                    st.plotly_chart(fig_spd2, use_container_width=True)
-        else:
-            alert_box("blue", "Historical comparison available after 2+ daily AIS collection runs. Currently only 1 date in the dataset.")
-    else:
-        alert_box("blue", "AIS historical data not available — run ingest_ais.py to populate.")
-
     svt = D.get("analysis_strait_vessel_trend", pd.DataFrame())
     if not svt.empty and "strait_name" in svt.columns:
         h("Vessel traffic trends at critical straits")
