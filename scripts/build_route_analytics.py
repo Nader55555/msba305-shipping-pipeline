@@ -4,9 +4,14 @@ Joins AIS + fuel + weather + news + BDI to produce route-level analytics.
 Compares current vessel activity vs historical baseline per route.
 Run: python scripts/build_route_analytics.py
 """
+import os
 import pathlib
 import pandas as pd
 import yaml
+
+BQ_PROJECT = os.getenv("BQ_PROJECT", "msba305-shipping")
+BQ_DATASET = os.getenv("BQ_DATASET", "shipping_data")
+GCP_KEY    = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "gcp_key.json")
 
 ROOT  = pathlib.Path(__file__).resolve().parents[1]
 CLEAN = ROOT / "data" / "clean"
@@ -75,6 +80,28 @@ def map_to_route(port_guess):
     return "Unmapped / Other"
 
 
+def upload_to_bq(df: pd.DataFrame, table_name: str) -> None:
+    """Upload DataFrame to BigQuery — WRITE_TRUNCATE."""
+    if df.empty:
+        print(f"  ⚠ Skipping {table_name} — empty DataFrame")
+        return
+    try:
+        from google.cloud import bigquery
+        from google.oauth2 import service_account
+        creds  = service_account.Credentials.from_service_account_file(GCP_KEY)
+        client = bigquery.Client(project=BQ_PROJECT, credentials=creds)
+        table_ref  = f"{BQ_PROJECT}.{BQ_DATASET}.{table_name}"
+        job_config = bigquery.LoadJobConfig(
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+            autodetect=True,
+        )
+        job = client.load_table_from_dataframe(df, table_ref, job_config=job_config)
+        job.result()
+        print(f"  ✓ BigQuery: {table_name} ({len(df):,} rows)")
+    except Exception as e:
+        print(f"  ✗ BigQuery upload failed for {table_name}: {e}")
+
+
 def main():
     print("\n=== BUILD ROUTE ANALYTICS ===")
 
@@ -112,6 +139,7 @@ def main():
             })
     baseline_df = pd.DataFrame(baselines)
     save(baseline_df, "route_baselines.csv")
+    upload_to_bq(baseline_df, "route_baselines")
 
     # ── 3. CURRENT VS HISTORICAL (latest day per route) ───────────────────────
     current_rows = []
@@ -182,6 +210,7 @@ def main():
 
     current_df = pd.DataFrame(current_rows)
     save(current_df, "analysis_current_vs_historical.csv")
+    upload_to_bq(current_df, "analysis_current_vs_historical")
 
     # ── 4. DEVIATION ALERTS ───────────────────────────────────────────────────
     if not current_df.empty:
@@ -199,6 +228,7 @@ def main():
             "Fuel spike",  axis=1
         )
         save(alerts, "route_deviation_alerts.csv")
+        upload_to_bq(alerts, "route_deviation_alerts")
     else:
         save(pd.DataFrame(), "route_deviation_alerts.csv")
 
