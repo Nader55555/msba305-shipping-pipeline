@@ -3,15 +3,16 @@ dashboard/app.py
 Maritime Shipping Intelligence Dashboard — MSBA 305
 Run: streamlit run dashboard/app.py
 
-8 pages:
-  1. Executive Summary     — Morning briefing across all sources
-  2. Strait Monitor        — 8 chokepoints: Hormuz, Malacca, Suez, Bab el-Mandeb...
-  3. Route Disruption      — 6 key trade routes: are they clear today?
-  4. Baltic Dry Index      — BDI trend, signals, charter recommendations
-  5. Trade Analysis        — Comtrade flows, balance, commodity breakdown
-  6. Port Risk             — 20 ports: weather + trade exposure
-  7. Vessel Activity       — AIS positions, vessel types, speeds (Singapore)
-  8. Cross-Source Insights — BDI×Trade, China concentration, seasonal booking
+9 pages:
+  1. Live Intelligence     — Vessel map + fuel prices + news + route impact
+  2. Executive Summary     — Morning briefing across all sources
+  3. Strait Monitor        — 8 chokepoints: Hormuz, Malacca, Suez, Bab el-Mandeb...
+  4. Route Disruption      — 6 key trade routes: are they clear today?
+  5. Baltic Dry Index      — BDI trend, signals, charter recommendations
+  6. Trade Analysis        — Comtrade flows, balance, commodity breakdown
+  7. Port Risk             — 20 ports: weather + trade exposure
+  8. Vessel Activity       — AIS positions, vessel types, speeds
+  9. Cross-Source Insights — BDI×Trade, China concentration, seasonal booking
 """
 
 import os
@@ -124,7 +125,10 @@ def load_bigquery(project: str, dataset: str, key: str) -> dict:
               "analysis_strait_monitor", "analysis_commodity_bdi",
               "analysis_bdi_signals", "analysis_net_exporter_risk",
               "analysis_seasonal_freight", "analysis_china_concentration",
-              "analysis_vessel_port_risk", "analysis_route_disruption", "analysis_strait_vessel_trend"]:
+              "analysis_vessel_port_risk", "analysis_route_disruption",
+              "analysis_strait_vessel_trend",
+              "fuel_prices_daily", "shipping_news",
+              "analysis_current_vs_historical", "route_deviation_alerts"]:
         try:
             df = client.query(f"SELECT * FROM `{project}.{dataset}.{t}`").to_dataframe()
             df.columns = [c.lower() for c in df.columns]
@@ -154,6 +158,10 @@ def load_csv() -> dict:
         "analysis_vessel_port_risk":   "analysis_vessel_port_risk.csv",
         "analysis_strait_vessel_trend":"analysis_strait_vessel_trend.csv",
         "analysis_route_disruption":   "analysis_route_disruption.csv",
+        "fuel_prices_daily":           "fuel_prices_daily.csv",
+        "shipping_news":               "shipping_news.csv",
+        "analysis_current_vs_historical": "analysis_current_vs_historical.csv",
+        "route_deviation_alerts":      "route_deviation_alerts.csv",
     }
     out = {}
     for key, fname in files.items():
@@ -169,6 +177,7 @@ with st.sidebar:
     st.markdown('<div style="font-size:10px;color:#8aacc8;margin-bottom:20px;">American University of Beirut<br>Dr. Ahmad El-Hajj | Spring 2025/2026<br><span style="color:#4a7fa5;font-style:italic;">Academic project — for educational purposes only</span></div>', unsafe_allow_html=True)
 
     page = st.radio("Navigation", [
+        "🌐 Live Intelligence",
         "📊 Executive Summary",
         "🚧 Strait Monitor",
         "🛳  Route Disruption",
@@ -280,9 +289,169 @@ def status_badge(status: str) -> str:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 1 — EXECUTIVE SUMMARY
+# PAGE 1 — LIVE INTELLIGENCE (NEW)
 # ══════════════════════════════════════════════════════════════════════════════
-if page == "📊 Executive Summary":
+if page == "🌐 Live Intelligence":
+    title("Live Intelligence", "Vessels · Fuel prices · Shipping news · Route impact vs history")
+    st.info("🎓 This is an academic project developed for MSBA 305 — Data Processing Framework at the American University of Beirut. All data is from public sources. For educational purposes only.")
+
+    # ── VESSEL MAP (full width) ───────────────────────────────────────────────
+    h("Global vessel positions — live AIS snapshot")
+    st.markdown('<p style="font-size:13px;color:#c8d8e8;">Every dot is a vessel captured in the daily AIS collection window. Hover for vessel name, speed, and destination.</p>', unsafe_allow_html=True)
+
+    pos = ais.dropna(subset=["latitude","longitude"]) if not ais.empty and "latitude" in ais.columns else pd.DataFrame()
+    if not pos.empty:
+        CAT_COLOR = {"Tanker":C["coral"],"Cargo":C["blue"],"Tug / Support":C["amber"],
+                     "Fishing":C["teal"],"Passenger":C["purple"],"Unknown":C["gray"],"Other":C["gray"]}
+        clat = float(pos["latitude"].median())
+        clon = float(pos["longitude"].median())
+        fig_map = go.Figure()
+        for cat in (pos["vessel_category"].dropna().unique() if "vessel_category" in pos.columns else ["Unknown"]):
+            sub = pos[pos["vessel_category"]==cat] if "vessel_category" in pos.columns else pos
+            mv  = sub[sub["is_moving"]==True]  if "is_moving" in sub.columns else sub
+            st_ = sub[sub["is_moving"]!=True]  if "is_moving" in sub.columns else pd.DataFrame()
+            if not mv.empty:
+                hover_cols = ["ship_name","sog_knots","nav_status_name","destination"]
+                hover_data = mv[hover_cols].fillna("").values if all(c in mv.columns for c in hover_cols) else None
+                fig_map.add_trace(go.Scattermapbox(
+                    lat=mv["latitude"], lon=mv["longitude"], mode="markers",
+                    name=f"{cat} (moving)",
+                    marker=dict(size=8, color=CAT_COLOR.get(cat, C["gray"]), opacity=0.85),
+                    customdata=hover_data,
+                    hovertemplate=(
+                        "<b>%{customdata[0]}</b><br>Speed: %{customdata[1]:.1f} kn<br>"
+                        "Status: %{customdata[2]}<br>Dest: %{customdata[3]}<extra></extra>"
+                    ) if hover_data is not None else None,
+                ))
+            if not st_.empty:
+                fig_map.add_trace(go.Scattermapbox(
+                    lat=st_["latitude"], lon=st_["longitude"], mode="markers",
+                    name=f"{cat} (stationary)",
+                    marker=dict(size=4, color=CAT_COLOR.get(cat, C["gray"]), opacity=0.35),
+                    showlegend=False,
+                ))
+        fig_map.update_layout(
+            mapbox=dict(style="open-street-map", center=dict(lat=clat, lon=clon), zoom=1),
+            paper_bgcolor="#0d2137", font=dict(color="#ffffff", size=11),
+            legend=dict(bgcolor="rgba(13,33,55,0.85)", bordercolor="#4a7fa5",
+                        borderwidth=1, font=dict(color="#ffffff", size=10)),
+            height=500, margin=dict(t=5, b=5, l=5, r=5),
+        )
+        st.plotly_chart(fig_map, use_container_width=True)
+
+        # Quick vessel KPIs
+        vk1, vk2, vk3, vk4 = st.columns(4)
+        vk1.metric("Vessels tracked", f"{pos['mmsi'].nunique():,}" if "mmsi" in pos.columns else len(pos))
+        vk2.metric("Moving", f"{int((ais['is_moving']==True).sum()):,}" if "is_moving" in ais.columns else "N/A")
+        vk3.metric("Tankers", f"{int((pos['vessel_category']=='Tanker').sum()):,}" if "vessel_category" in pos.columns else "N/A")
+        vk4.metric("Cargo ships", f"{int((pos['vessel_category']=='Cargo').sum()):,}" if "vessel_category" in pos.columns else "N/A")
+    else:
+        alert_box("amber", "Run ingest_ais.py to populate vessel positions.")
+
+    st.markdown("---")
+
+    # ── BOTTOM ROW: 3 columns — Fuel | News | Route Impact ───────────────────
+    col_fuel, col_news, col_route = st.columns([1.2, 1.4, 1.4])
+
+    # ─── FUEL PRICES ──────────────────────────────────────────────────────────
+    with col_fuel:
+        h("Brent crude oil — last 90 days")
+        fuel_df = D.get("fuel_prices_daily", pd.DataFrame())
+        if not fuel_df.empty and "brent_usd_per_bbl" in fuel_df.columns:
+            fuel_df["date"] = pd.to_datetime(fuel_df["date"], errors="coerce")
+            fuel_df = fuel_df.sort_values("date").tail(90)
+            latest_fuel  = fuel_df.iloc[-1]
+            prev_fuel    = fuel_df.iloc[-8] if len(fuel_df) > 8 else fuel_df.iloc[0]
+            fuel_signal  = str(latest_fuel.get("fuel_signal", "NORMAL"))
+            fuel_sig_cls = "red" if fuel_signal == "HIGH" else "amber" if fuel_signal == "ELEVATED" else "green"
+            sig_emoji    = "🔴" if fuel_signal == "HIGH" else "🟡" if fuel_signal == "ELEVATED" else "🟢"
+
+            # KPI
+            fk1, fk2 = st.columns(2)
+            fk1.metric("Brent price", f"${latest_fuel['brent_usd_per_bbl']:.2f}/bbl",
+                       delta=f"{latest_fuel['brent_usd_per_bbl']-prev_fuel['brent_usd_per_bbl']:+.2f} (7d)")
+            fk2.metric("Fuel signal", f"{sig_emoji} {fuel_signal}")
+
+            fig_fuel = go.Figure()
+            fig_fuel.add_trace(go.Scatter(
+                x=fuel_df["date"], y=fuel_df["brent_usd_per_bbl"],
+                mode="lines", name="Brent", line=dict(color=C["amber"], width=2),
+                fill="tozeroy", fillcolor="rgba(239,159,39,0.08)",
+            ))
+            if "brent_30d_avg" in fuel_df.columns:
+                fig_fuel.add_trace(go.Scatter(
+                    x=fuel_df["date"], y=fuel_df["brent_30d_avg"],
+                    mode="lines", name="30d avg",
+                    line=dict(color=C["blue"], width=1.5, dash="dot"),
+                ))
+            fig_fuel.update_layout(**layout(height=220, hovermode="x unified",
+                                   yaxis_title="USD/bbl",
+                                   margin=dict(t=10,b=40,l=50,r=10)))
+            st.plotly_chart(fig_fuel, use_container_width=True)
+            st.markdown('<p style="font-size:11px;color:#c8d8e8;">Source: U.S. Energy Information Administration (EIA) — Brent crude spot price</p>', unsafe_allow_html=True)
+        else:
+            alert_box("blue", "Run ingest_fuel.py to populate fuel price data.")
+
+    # ─── SHIPPING NEWS ────────────────────────────────────────────────────────
+    with col_news:
+        h("Shipping news alerts")
+        news_df = D.get("shipping_news", pd.DataFrame())
+        if not news_df.empty:
+            news_df["pub_date"] = pd.to_datetime(news_df["pub_date"], errors="coerce")
+            news_df = news_df.sort_values("risk_score", ascending=False).head(8)
+            for _, row in news_df.iterrows():
+                rl  = str(row.get("risk_level", "LOW"))
+                cls = "red" if rl == "HIGH" else "amber" if rl == "MEDIUM" else "green"
+                score = int(row.get("risk_score", 0))
+                routes_tag = str(row.get("relevant_routes", "General"))
+                pub = row["pub_date"].strftime("%b %d") if pd.notna(row["pub_date"]) else ""
+                st.markdown(
+                    f'<div class="alert-card alert-{cls}" style="margin-bottom:4px;">'
+                    f'<div style="font-size:12px;font-weight:600;">{row.get("title","")[:75]}{"..." if len(str(row.get("title",""))) > 75 else ""}</div>'
+                    f'<div style="font-size:10px;color:#8aacc8;margin-top:2px;">'
+                    f'{pub} · Risk: {score}/100 · {routes_tag}</div>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+        else:
+            alert_box("blue", "Run ingest_news.py to populate shipping news.")
+
+    # ─── ROUTE IMPACT VS HISTORY ──────────────────────────────────────────────
+    with col_route:
+        h("Route impact vs historical baseline")
+        cvh = D.get("analysis_current_vs_historical", pd.DataFrame())
+        alerts_df = D.get("route_deviation_alerts", pd.DataFrame())
+        if not cvh.empty and "route_impact_score" in cvh.columns:
+            cvh = cvh[cvh["route"] != "Unmapped / Other"]
+            for _, row in cvh.sort_values("route_impact_score", ascending=False).iterrows():
+                status = str(row.get("status", "NORMAL"))
+                cls    = "red" if status == "CRITICAL" else "amber" if status == "ELEVATED" else "green"
+                score  = float(row.get("route_impact_score", 0))
+                tvh    = float(row.get("traffic_vs_history_pct", 0))
+                fuel_s = str(row.get("fuel_signal", "NORMAL"))
+                news_r = float(row.get("news_risk_score", 0))
+                st.markdown(
+                    f'<div class="alert-card alert-{cls}" style="margin-bottom:4px;">'
+                    f'<b style="font-size:12px;">{row.get("route","")}</b>'
+                    f'<span style="float:right;font-size:11px;">Impact: {score:.0f}/100</span><br>'
+                    f'<span style="font-size:10px;color:#c8d8e8;">'
+                    f'Traffic vs history: {tvh:+.0f}% &nbsp;|&nbsp; '
+                    f'Fuel: {fuel_s} &nbsp;|&nbsp; News risk: {news_r:.0f}'
+                    f'</span></div>',
+                    unsafe_allow_html=True,
+                )
+            if not alerts_df.empty and "deviation_flag" in alerts_df.columns:
+                flagged = alerts_df[alerts_df["deviation_flag"] == True]
+                if not flagged.empty:
+                    st.markdown(f'<p style="color:#ff6b6b;font-size:12px;font-weight:600;">⚠ {len(flagged)} deviation alert(s) active</p>', unsafe_allow_html=True)
+        else:
+            alert_box("blue", "Run build_route_analytics.py to populate route impact data.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE 2 — EXECUTIVE SUMMARY
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📊 Executive Summary":
     title("Executive Summary", "Maritime shipping intelligence — morning briefing")
 
     today = datetime.now().strftime("%B %d, %Y")
