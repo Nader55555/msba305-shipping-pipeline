@@ -119,16 +119,22 @@ def load_bigquery(project: str, dataset: str, key: str) -> dict:
         use_project = project
     client = bigquery.Client(project=use_project, credentials=creds)
     tables = {}
-    for t in ["bdi_daily", "trade_flows", "port_weather", "vessel_movements",
-              "strait_conditions",
-              "analysis_bdi_trade", "analysis_port_risk_trade",
-              "analysis_strait_monitor", "analysis_commodity_bdi",
-              "analysis_bdi_signals", "analysis_net_exporter_risk",
-              "analysis_seasonal_freight", "analysis_china_concentration",
-              "analysis_vessel_port_risk", "analysis_route_disruption",
-              "analysis_strait_vessel_trend",
-              "fuel_prices_daily", "shipping_news",
-              "analysis_current_vs_historical", "route_deviation_alerts"]:
+    CORE_TABLES = [
+        "bdi_daily", "trade_flows", "port_weather", "vessel_movements",
+        "strait_conditions",
+        "analysis_bdi_trade", "analysis_port_risk_trade",
+        "analysis_strait_monitor", "analysis_commodity_bdi",
+        "analysis_bdi_signals", "analysis_net_exporter_risk",
+        "analysis_seasonal_freight", "analysis_china_concentration",
+        "analysis_vessel_port_risk", "analysis_route_disruption",
+        "analysis_strait_vessel_trend",
+    ]
+    EXTENDED_TABLES = [
+        "fuel_prices_daily", "shipping_news",
+        "analysis_current_vs_historical", "route_deviation_alerts",
+        "route_baselines",
+    ]
+    for t in CORE_TABLES + EXTENDED_TABLES:
         try:
             df = client.query(f"SELECT * FROM `{project}.{dataset}.{t}`").to_dataframe()
             df.columns = [c.lower() for c in df.columns]
@@ -212,7 +218,7 @@ with st.sidebar:
         else:
             bq_project = bq_dataset = key_file = ""
 
-    st.markdown('<div style="font-size:11px;color:#5a8aaa;margin-top:24px;line-height:1.6;">Sources: UN Comtrade · BDI (investing.com, manual) · OpenWeatherMap · AISStream<br>Storage: BigQuery | Dashboard: Streamlit</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:11px;color:#5a8aaa;margin-top:24px;line-height:1.6;">Sources: UN Comtrade · BDI · OpenWeatherMap<br>AISStream · EIA (fuel) · NewsData.io (news)<br>Storage: BigQuery | Dashboard: Streamlit</div>', unsafe_allow_html=True)
 
 
 # ── LOAD ──────────────────────────────────────────────────────────────────────
@@ -293,13 +299,14 @@ def status_badge(status: str) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 if page == "🌐 Live Intelligence":
     title("Live Intelligence", "Vessels · Fuel prices · Shipping news · Route impact vs history")
-    st.info("🎓 This is an academic project developed for MSBA 305 — Data Processing Framework at the American University of Beirut. All data is from public sources. For educational purposes only.")
 
     # ── VESSEL MAP (full width) ───────────────────────────────────────────────
     h("Global vessel positions — live AIS snapshot")
     st.markdown('<p style="font-size:13px;color:#c8d8e8;">Every dot is a vessel captured in the daily AIS collection window. Hover for vessel name, speed, and destination.</p>', unsafe_allow_html=True)
 
-    pos = ais.dropna(subset=["latitude","longitude"]) if not ais.empty and "latitude" in ais.columns else pd.DataFrame()
+    # Filter to latest date only for the map
+    ais_latest = latest_snapshot(ais, "fetch_date") if not ais.empty else ais
+    pos = ais_latest.dropna(subset=["latitude","longitude"]) if not ais_latest.empty and "latitude" in ais_latest.columns else pd.DataFrame()
     if not pos.empty:
         CAT_COLOR = {"Tanker":C["coral"],"Cargo":C["blue"],"Tug / Support":C["amber"],
                      "Fishing":C["teal"],"Passenger":C["purple"],"Unknown":C["gray"],"Other":C["gray"]}
@@ -342,9 +349,9 @@ if page == "🌐 Live Intelligence":
         # Quick vessel KPIs
         vk1, vk2, vk3, vk4 = st.columns(4)
         vk1.metric("Vessels tracked", f"{pos['mmsi'].nunique():,}" if "mmsi" in pos.columns else len(pos))
-        vk2.metric("Moving", f"{int((ais['is_moving']==True).sum()):,}" if "is_moving" in ais.columns else "N/A")
-        vk3.metric("Tankers", f"{int((pos['vessel_category']=='Tanker').sum()):,}" if "vessel_category" in pos.columns else "N/A")
-        vk4.metric("Cargo ships", f"{int((pos['vessel_category']=='Cargo').sum()):,}" if "vessel_category" in pos.columns else "N/A")
+        vk2.metric("Moving", f"{int((ais_latest['is_moving']==True).sum()):,}" if "is_moving" in ais_latest.columns else "N/A")
+        vk3.metric("Tankers", f"{int((ais_latest['vessel_category']=='Tanker').sum()):,}" if "vessel_category" in ais_latest.columns else "N/A")
+        vk4.metric("Cargo ships", f"{int((ais_latest['vessel_category']=='Cargo').sum()):,}" if "vessel_category" in ais_latest.columns else "N/A")
     else:
         alert_box("amber", "Run ingest_ais.py to populate vessel positions.")
 
@@ -457,7 +464,6 @@ elif page == "📊 Executive Summary":
     today = datetime.now().strftime("%B %d, %Y")
     st.markdown(f'<div style="font-size:12px;color:#c8d8e8;margin-bottom:1rem;">📅 {today}</div>',
                 unsafe_allow_html=True)
-    st.info("🎓 This is an academic project developed for MSBA 305 — Data Processing Framework at the American University of Beirut. All data is from public sources. For educational purposes only.")
     st.markdown('<p style="font-size:13px;color:#c8d8e8;">This dashboard combines 4 live data sources to give you a daily shipping intelligence briefing. Start here every morning: check disrupted routes first, then BDI signal, then port alerts.</p>', unsafe_allow_html=True)
 
     # ── Row 1: Top KPIs ──
@@ -1683,7 +1689,7 @@ st.markdown("""
 <div style="margin-top:3rem;padding:1rem;border-top:1px solid #1e3a5f;
             text-align:center;font-size:11px;color:#4a7fa5;">
   MSBA 305 — Maritime Shipping Intelligence Pipeline &nbsp;·&nbsp;
-  Sources: UN Comtrade · BDI (investing.com, manual) · OpenWeatherMap · AISStream &nbsp;·&nbsp;
-  Storage: Google BigQuery &nbsp;·&nbsp; 10 analytical insight tables
+  Sources: UN Comtrade · BDI · OpenWeatherMap · AISStream · EIA · NewsData.io &nbsp;·&nbsp;
+  Storage: Google BigQuery &nbsp;·&nbsp; 6 data sources · 12+ analytical tables
 </div>
 """, unsafe_allow_html=True)
