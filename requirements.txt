@@ -12,3 +12,4 @@ db-dtypes
 pydantic
 streamlit
 plotly
+pyyaml
