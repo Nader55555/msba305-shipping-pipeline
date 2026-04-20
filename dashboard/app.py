@@ -681,24 +681,24 @@ elif page == "📈 Baltic Dry Index":
     fig.update_layout(**DARK, title="Baltic Dry Index", title_font=dict(color="white"), legend_font=dict(color="white"),height=380, hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
-    # ── Signals chart ──
+    # ── Signals chart (collapsed — supplements main chart) ──
     if not sig_df.empty and "market_signal" in sig_df.columns:
-        h("Market signals timeline")
-        sig_yr = sig_df[(sig_df["date"].dt.year >= yr_r[0]) & (sig_df["date"].dt.year <= yr_r[1])].copy()
-        signal_colors = {"BULLISH": C["teal"], "BEARISH": C["coral"], "OVERBOUGHT": C["amber"],
-                         "OVERSOLD": C["purple"], "NEUTRAL": C["gray"]}
-        fig_s = go.Figure()
-        for sig, col in signal_colors.items():
-            sub = sig_yr[sig_yr["market_signal"] == sig]
-            if not sub.empty:
-                fig_s.add_trace(go.Scatter(
-                    x=sub["date"], y=sub["bdi_value"], mode="markers",
-                    name=sig, marker=dict(size=4, color=col, opacity=0.7),
-                ))
-        fig_s.update_layout(**layout(height=220, hovermode="x unified",
-                            title="BDI coloured by market signal",title_font=dict(color="white"),legend_font=dict(color="white"),
-                            margin=dict(t=40, b=30, l=40, r=10)))
-        st.plotly_chart(fig_s, use_container_width=True)
+        with st.expander("📊 Market signals timeline — BDI coloured by signal type", expanded=False):
+            sig_yr = sig_df[(sig_df["date"].dt.year >= yr_r[0]) & (sig_df["date"].dt.year <= yr_r[1])].copy()
+            signal_colors = {"BULLISH": C["teal"], "BEARISH": C["coral"], "OVERBOUGHT": C["amber"],
+                             "OVERSOLD": C["purple"], "NEUTRAL": C["gray"]}
+            fig_s = go.Figure()
+            for sig, col in signal_colors.items():
+                sub = sig_yr[sig_yr["market_signal"] == sig]
+                if not sub.empty:
+                    fig_s.add_trace(go.Scatter(
+                        x=sub["date"], y=sub["bdi_value"], mode="markers",
+                        name=sig, marker=dict(size=4, color=col, opacity=0.7),
+                    ))
+            fig_s.update_layout(**layout(height=220, hovermode="x unified",
+                                title="BDI coloured by market signal",title_font=dict(color="white"),legend_font=dict(color="white"),
+                                margin=dict(t=40, b=30, l=40, r=10)))
+            st.plotly_chart(fig_s, use_container_width=True)
 
     # ── Volatility + monthly seasonality ──
     c1, c2 = st.columns(2)
@@ -856,24 +856,25 @@ elif page == "🌍 Trade Analysis":
                                   "bdi_yoy_pct","trade_yoy_pct","correlation_signal"]],
                              use_container_width=True)
 
-    # ── YoY heatmap ──
+    # ── YoY heatmap (in expander — detailed, not needed at first glance) ──
     if "yoy_growth_pct" in dft.columns and "flow_direction" in dft.columns:
-        h("Year-on-year export growth % — top 20 countries")
-        yoy = (dft[dft["flow_direction"]=="Export"]
-               .groupby(["reporter_country","year"])["yoy_growth_pct"].mean().reset_index())
-        top20 = (dft[dft["flow_direction"]=="Export"]
-                 .groupby("reporter_country")["trade_value_usd"].sum().nlargest(20).index.tolist())
-        yoy20 = yoy[yoy["reporter_country"].isin(top20)]
-        pvt   = yoy20.pivot(index="reporter_country", columns="year", values="yoy_growth_pct")
-        fig5  = go.Figure(go.Heatmap(
-            z=pvt.values, x=pvt.columns.astype(str), y=pvt.index,
-            colorscale=[[0,C["coral"]],[0.5,"#0d2137"],[1,C["teal"]]],
-            zmid=0, zmin=-30, zmax=30,
-            colorbar=dict(title="%", tickfont=dict(color="#8aacc8")),
-            text=pvt.values.round(1), texttemplate="%{text}", textfont=dict(size=9),
-        ))
-        fig5.update_layout(**layout(height=420, margin=dict(t=10,b=40,l=140,r=20)))
-        st.plotly_chart(fig5, use_container_width=True)
+        with st.expander("📊 Year-on-year export growth % — top 20 countries", expanded=False):
+            st.caption("Green = export growth that year. Red = export decline. NaN = no data submitted to UN Comtrade.")
+            yoy = (dft[dft["flow_direction"]=="Export"]
+                   .groupby(["reporter_country","year"])["yoy_growth_pct"].mean().reset_index())
+            top20 = (dft[dft["flow_direction"]=="Export"]
+                     .groupby("reporter_country")["trade_value_usd"].sum().nlargest(20).index.tolist())
+            yoy20 = yoy[yoy["reporter_country"].isin(top20)]
+            pvt   = yoy20.pivot(index="reporter_country", columns="year", values="yoy_growth_pct")
+            fig5  = go.Figure(go.Heatmap(
+                z=pvt.values, x=pvt.columns.astype(str), y=pvt.index,
+                colorscale=[[0,C["coral"]],[0.5,"#0d2137"],[1,C["teal"]]],
+                zmid=0, zmin=-30, zmax=30,
+                colorbar=dict(title="%", tickfont=dict(color="#8aacc8")),
+                text=pvt.values.round(1), texttemplate="%{text}", textfont=dict(size=9),
+            ))
+            fig5.update_layout(**layout(height=420, margin=dict(t=10,b=40,l=140,r=20)))
+            st.plotly_chart(fig5, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -987,14 +988,14 @@ elif page == "🌦  Port Risk":
                                margin=dict(t=10,b=40,l=60,r=10)))
             st.plotly_chart(fig2, use_container_width=True)
 
-    # ── Net exporter risk table ──
+    # ── Net exporter risk table → expander ──
     ner = D.get("analysis_net_exporter_risk", pd.DataFrame())
     if not ner.empty:
-        h("Net exporters ranked by value + current weather impact")
-        show_c = ["reporter_country","trade_balance_B","is_net_exporter","top_export_commodity",
-                  "port_name","beaufort_number","weather_impact"]
-        show_c = [c for c in show_c if c in ner.columns]
-        st.dataframe(ner[show_c].head(20), use_container_width=True, height=320)
+        with st.expander("📋 Net exporters ranked by value + current weather impact", expanded=False):
+            show_c = ["reporter_country","trade_balance_B","is_net_exporter","top_export_commodity",
+                      "port_name","beaufort_number","weather_impact"]
+            show_c = [c for c in show_c if c in ner.columns]
+            st.dataframe(ner[show_c].head(20), use_container_width=True, height=320)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1130,51 +1131,49 @@ elif page == "🛥  Vessel Activity":
                                margin=dict(t=10,b=50,l=30,r=10), xaxis_tickangle=-30))
             st.plotly_chart(fig3, use_container_width=True)
 
-    # ── Top destinations ──────────────────────────────────────────────────
-    if "destination" in df_a.columns:
-        h("Top vessel destinations")
-        dests = (df_a[df_a["destination"].notna() &
-                      (df_a["destination"].str.strip() != "") &
-                      (~df_a["destination"].str.startswith("@"))]
-                 ["destination"].str.strip().str.upper()
-                 .value_counts().head(15).reset_index())
-        dests.columns = ["destination", "count"]
-        if not dests.empty:
-            st.caption("Where are vessels heading? Shows the 15 most common declared destinations.")
-            fig_d = go.Figure(go.Bar(
-                x=dests["count"], y=dests["destination"],
-                orientation="h",
-                marker_color=C["blue"],
-                text=dests["count"],
-                textposition="outside",
-                textfont=dict(color="#ffffff", size=10),
-            ))
-            fig_d.update_layout(**layout(height=360,
-                                         xaxis_title="Vessel count",
-                                         margin=dict(t=10,b=40,l=120,r=60)))
-            fig_d.update_layout(yaxis=dict(autorange="reversed",
-                                           gridcolor="#1e3a5f", linecolor="#1e3a5f",
-                                           color="#ffffff"))
-            st.plotly_chart(fig_d, use_container_width=True)
-
-    # ── Speed distribution histogram ──────────────────────────────────────
-    if "sog_knots" in df_a.columns:
-        h("Speed distribution of moving vessels")
-        mv_spd = df_a[(df_a["sog_knots"].notna()) & (df_a["sog_knots"] > 0.5)]["sog_knots"]
-        if not mv_spd.empty:
-            st.caption("Speed distribution (knots) — shows whether vessels are transiting normally or moving slowly (possible congestion or maneuvering).")
-            fig_spd = go.Figure(go.Histogram(
-                x=mv_spd, nbinsx=30,
-                marker_color=C["teal"], opacity=0.8,
-            ))
-            fig_spd.add_vline(x=10, line_dash="dash", line_color=C["amber"],
-                               annotation_text="Cruising threshold",
-                               annotation_font_color=C["amber"])
-            fig_spd.update_layout(**layout(height=250,
-                                            xaxis_title="Speed (knots)",
-                                            yaxis_title="Vessel count",
-                                            margin=dict(t=10,b=50,l=50,r=20)))
-            st.plotly_chart(fig_spd, use_container_width=True)
+    # ── Top destinations + speed histogram → expander ──────────────────
+    with st.expander("🔍 Vessel destinations & speed distribution", expanded=False):
+        dc1, dc2 = st.columns(2)
+        with dc1:
+            if "destination" in df_a.columns:
+                h("Top 15 declared destinations")
+                dests = (df_a[df_a["destination"].notna() &
+                              (df_a["destination"].str.strip() != "") &
+                              (~df_a["destination"].str.startswith("@"))]
+                         ["destination"].str.strip().str.upper()
+                         .value_counts().head(15).reset_index())
+                dests.columns = ["destination", "count"]
+                if not dests.empty:
+                    fig_d = go.Figure(go.Bar(
+                        x=dests["count"], y=dests["destination"],
+                        orientation="h", marker_color=C["blue"],
+                        text=dests["count"], textposition="outside",
+                        textfont=dict(color="#ffffff", size=10),
+                    ))
+                    fig_d.update_layout(**layout(height=360,
+                                                 xaxis_title="Vessel count",
+                                                 margin=dict(t=10,b=40,l=120,r=60)))
+                    fig_d.update_layout(yaxis=dict(autorange="reversed",
+                                                   gridcolor="#1e3a5f", linecolor="#1e3a5f",
+                                                   color="#ffffff"))
+                    st.plotly_chart(fig_d, use_container_width=True)
+        with dc2:
+            if "sog_knots" in df_a.columns:
+                h("Speed distribution (moving vessels)")
+                mv_spd = df_a[(df_a["sog_knots"].notna()) & (df_a["sog_knots"] > 0.5)]["sog_knots"]
+                if not mv_spd.empty:
+                    fig_spd = go.Figure(go.Histogram(
+                        x=mv_spd, nbinsx=30,
+                        marker_color=C["teal"], opacity=0.8,
+                    ))
+                    fig_spd.add_vline(x=10, line_dash="dash", line_color=C["amber"],
+                                       annotation_text="Cruising threshold",
+                                       annotation_font_color=C["amber"])
+                    fig_spd.update_layout(**layout(height=360,
+                                                    xaxis_title="Speed (knots)",
+                                                    yaxis_title="Vessel count",
+                                                    margin=dict(t=10,b=50,l=50,r=20)))
+                    st.plotly_chart(fig_spd, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1349,6 +1348,107 @@ elif page == "🔗 Cross-Source Insights":
 
 
     # ── Strait vessel traffic trends ──
+    # ── Historical vessel comparison ──────────────────────────────────────
+    h("Historical vessel activity — daily trends")
+    st.caption("Compare vessel counts, types, and speeds across all collection dates. A drop in vessel count at a high-risk strait is an early disruption signal.")
+
+    if not ais.empty and "fetch_date" in ais.columns:
+        ais["fetch_date"] = pd.to_datetime(ais["fetch_date"], errors="coerce")
+        hist_dates = ais["fetch_date"].dropna().unique()
+
+        if len(hist_dates) > 1:
+            hc1, hc2 = st.columns(2)
+            with hc1:
+                # Daily unique vessel count over time
+                daily_total = (ais.groupby("fetch_date")["mmsi"]
+                               .nunique().reset_index()
+                               .rename(columns={"mmsi":"unique_vessels"})
+                               .sort_values("fetch_date"))
+                fig_hist = go.Figure()
+                fig_hist.add_trace(go.Scatter(
+                    x=daily_total["fetch_date"], y=daily_total["unique_vessels"],
+                    mode="lines+markers", name="All vessels",
+                    line=dict(color=C["blue"], width=2),
+                    marker=dict(size=6),
+                    hovertemplate="Date: %{x}<br>Vessels: %{y}<extra></extra>",
+                ))
+                fig_hist.update_layout(**layout(
+                    height=280, hovermode="x unified",
+                    xaxis_title="Date", yaxis_title="Unique vessels",
+                    margin=dict(t=10, b=50, l=50, r=20),
+                ))
+                fig_hist.add_hline(
+                    y=daily_total["unique_vessels"].mean(),
+                    line_dash="dash", line_color=C["amber"],
+                    annotation_text=f"Avg: {daily_total['unique_vessels'].mean():.0f}",
+                    annotation_font_color=C["amber"],
+                )
+                h("Daily unique vessel count over time")
+                st.plotly_chart(fig_hist, use_container_width=True)
+
+            with hc2:
+                # Daily vessel count by category
+                if "vessel_category" in ais.columns:
+                    daily_cat = (ais[ais["vessel_category"].isin(["Cargo","Tanker","Passenger","Fishing"])]
+                                 .groupby(["fetch_date","vessel_category"])["mmsi"]
+                                 .nunique().reset_index()
+                                 .rename(columns={"mmsi":"count"})
+                                 .sort_values("fetch_date"))
+                    fig_cat = go.Figure()
+                    cat_colors = {"Cargo":C["blue"],"Tanker":C["coral"],"Passenger":C["purple"],"Fishing":C["teal"]}
+                    for cat in ["Cargo","Tanker","Passenger","Fishing"]:
+                        sub = daily_cat[daily_cat["vessel_category"]==cat]
+                        if not sub.empty:
+                            fig_cat.add_trace(go.Scatter(
+                                x=sub["fetch_date"], y=sub["count"],
+                                name=cat, mode="lines+markers",
+                                line=dict(color=cat_colors.get(cat,C["gray"]), width=2),
+                                marker=dict(size=5),
+                            ))
+                    fig_cat.update_layout(**layout(
+                        height=280, hovermode="x unified",
+                        xaxis_title="Date", yaxis_title="Vessel count",
+                        margin=dict(t=10, b=50, l=50, r=20),
+                    ))
+                    h("Daily vessels by type")
+                    st.plotly_chart(fig_cat, use_container_width=True)
+
+            # Average speed trend over time
+            if "sog_knots" in ais.columns:
+                daily_spd = (ais[ais["sog_knots"] > 0.5]
+                             .groupby("fetch_date")["sog_knots"]
+                             .mean().reset_index()
+                             .rename(columns={"sog_knots":"avg_speed"})
+                             .sort_values("fetch_date"))
+                if not daily_spd.empty:
+                    h("Average vessel speed over time (moving vessels only)")
+                    st.caption("A drop in average speed = more vessels are slow or stationary = possible congestion.")
+                    fig_spd2 = go.Figure()
+                    fig_spd2.add_trace(go.Scatter(
+                        x=daily_spd["fetch_date"], y=daily_spd["avg_speed"].round(2),
+                        mode="lines+markers", name="Avg speed",
+                        line=dict(color=C["teal"], width=2),
+                        marker=dict(size=6),
+                        fill="tozeroy", fillcolor="rgba(29,158,117,0.08)",
+                        hovertemplate="Date: %{x}<br>Avg speed: %{y:.1f} kn<extra></extra>",
+                    ))
+                    fig_spd2.add_hline(
+                        y=daily_spd["avg_speed"].mean(),
+                        line_dash="dash", line_color=C["amber"],
+                        annotation_text=f"Avg: {daily_spd['avg_speed'].mean():.1f} kn",
+                        annotation_font_color=C["amber"],
+                    )
+                    fig_spd2.update_layout(**layout(
+                        height=220, hovermode="x unified",
+                        xaxis_title="Date", yaxis_title="Avg speed (kn)",
+                        margin=dict(t=10, b=50, l=50, r=20),
+                    ))
+                    st.plotly_chart(fig_spd2, use_container_width=True)
+        else:
+            alert_box("blue", "Historical comparison available after 2+ daily AIS collection runs. Currently only 1 date in the dataset.")
+    else:
+        alert_box("blue", "AIS historical data not available — run ingest_ais.py to populate.")
+
     svt = D.get("analysis_strait_vessel_trend", pd.DataFrame())
     if not svt.empty and "strait_name" in svt.columns:
         h("Vessel traffic trends at critical straits")
