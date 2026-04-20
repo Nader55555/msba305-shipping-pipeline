@@ -60,7 +60,7 @@ st.markdown("""
     padding-bottom: 6px; border-bottom: 1px solid #1e3a5f;
   }
   .page-title  { font-size: 26px; font-weight: 600; color: #e8f0f8; margin-bottom: 4px; }
-  .page-sub    { font-size: 13px; color: #8aacc8; margin-bottom: 1.5rem; }
+  .page-sub    { font-size: 13px; color: #c8d8e8; margin-bottom: 1.5rem; }
   .badge-red   { background:#4a1a1a; color:#ff6b6b; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
   .badge-amber { background:#3a2a0a; color:#ffc65c; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
   .badge-green { background:#1a3a1a; color:#6bcf7f; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600; }
@@ -203,7 +203,7 @@ with st.sidebar:
         else:
             bq_project = bq_dataset = key_file = ""
 
-    st.markdown('<div style="font-size:11px;color:#2a4a6a;margin-top:24px;line-height:1.6;">Sources: UN Comtrade · BDI (investing.com, manual) · OpenWeatherMap · AISStream<br>Storage: BigQuery | Dashboard: Streamlit</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:11px;color:#5a8aaa;margin-top:24px;line-height:1.6;">Sources: UN Comtrade · BDI (investing.com, manual) · OpenWeatherMap · AISStream<br>Storage: BigQuery | Dashboard: Streamlit</div>', unsafe_allow_html=True)
 
 
 # ── LOAD ──────────────────────────────────────────────────────────────────────
@@ -286,10 +286,10 @@ if page == "📊 Executive Summary":
     title("Executive Summary", "Maritime shipping intelligence — morning briefing")
 
     today = datetime.now().strftime("%B %d, %Y")
-    st.markdown(f'<div style="font-size:12px;color:#4a7fa5;margin-bottom:1rem;">📅 {today}</div>',
+    st.markdown(f'<div style="font-size:12px;color:#c8d8e8;margin-bottom:1rem;">📅 {today}</div>',
                 unsafe_allow_html=True)
     st.info("🎓 This is an academic project developed for MSBA 305 — Data Processing Framework at the American University of Beirut. All data is from public sources. For educational purposes only.")
-    st.caption("This dashboard combines 4 live data sources to give you a daily shipping intelligence briefing. Start here every morning: check disrupted routes first, then BDI signal, then port alerts.")
+    st.markdown('<p style="font-size:13px;color:#c8d8e8;">This dashboard combines 4 live data sources to give you a daily shipping intelligence briefing. Start here every morning: check disrupted routes first, then BDI signal, then port alerts.</p>', unsafe_allow_html=True)
 
     # ── Row 1: Top KPIs ──
     k1, k2, k3, k4, k5, k6 = st.columns(6)
@@ -832,7 +832,7 @@ elif page == "🌍 Trade Analysis":
     bt = D.get("analysis_bdi_trade", pd.DataFrame())
     if not bt.empty and "avg_bdi" in bt.columns and "export_value_trillion" in bt.columns:
         h("BDI vs trade volume correlation (joined analysis)")
-        st.caption("💡 Blue bars = total export value (left axis). Orange line = average BDI (right axis). When the orange line rises faster than the bars, shipping costs are eating into trade margins.")
+        st.markdown('<p style="font-size:13px;color:#c8d8e8;">💡 Blue bars = total export value (left axis). Orange line = average BDI (right axis). When the orange line rises faster than the bars, shipping costs are eating into trade margins.</p>', unsafe_allow_html=True)
         for col in ["avg_bdi","export_value_trillion","bdi_yoy_pct","trade_yoy_pct"]:
             if col in bt.columns: bt[col] = pd.to_numeric(bt[col], errors="coerce")
         # Deduplicate: one row per year only — prevents multiple orange lines
@@ -859,7 +859,7 @@ elif page == "🌍 Trade Analysis":
     # ── YoY heatmap (expander) ──
     if "yoy_growth_pct" in dft.columns and "flow_direction" in dft.columns:
         with st.expander("📊 Year-on-year export growth % — top 20 countries", expanded=False):
-            st.caption("Green = export growth. Red = export decline. NaN = no data submitted to UN Comtrade.")
+            st.markdown('<p style="font-size:13px;color:#c8d8e8;">Green = export growth. Red = export decline. NaN = no data submitted to UN Comtrade.</p>', unsafe_allow_html=True)
             yoy = (dft[dft["flow_direction"]=="Export"]
                    .groupby(["reporter_country","year"])["yoy_growth_pct"].mean().reset_index())
             top20 = (dft[dft["flow_direction"]=="Export"]
@@ -941,10 +941,10 @@ elif page == "🌦  Port Risk":
         st.markdown(f"""
         <div class="alert-card alert-{cls}" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <div style="min-width:160px;"><b>{row.get('port_name','')} ({row.get('country_iso','')})</b></div>
-          <div style="color:#8aacc8;font-size:12px;">🌡 {row.get('temp_c','?'):.1f}°C</div>
-          <div style="color:#8aacc8;font-size:12px;">💨 {row.get('wind_speed_ms',0):.1f} m/s — {BEAUFORT_DESCS[bf] if bf<13 else 'Extreme'}</div>
-          <div style="color:#8aacc8;font-size:12px;">💧 {row.get('humidity_pct','?'):.0f}%</div>
-          <div style="color:#8aacc8;font-size:12px;">☁ {row.get('weather_main','')}</div>
+          <div style="color:#c8d8e8;font-size:12px;">🌡 {row.get('temp_c','?'):.1f}°C</div>
+          <div style="color:#c8d8e8;font-size:12px;">💨 {row.get('wind_speed_ms',0):.1f} m/s — {BEAUFORT_DESCS[bf] if bf<13 else 'Extreme'}</div>
+          <div style="color:#c8d8e8;font-size:12px;">💧 {row.get('humidity_pct','?'):.0f}%</div>
+          <div style="color:#c8d8e8;font-size:12px;">☁ {row.get('weather_main','')}</div>
           <div style="color:#e8c860;font-size:12px;">💰 Trade: {trade_str}</div>
           <div style="flex:1;font-size:11px;">{alert_txt}</div>
         </div>""", unsafe_allow_html=True)
@@ -1179,7 +1179,7 @@ elif page == "🛥  Vessel Activity":
 
     # ── Historical vessel comparison ──────────────────────────────────────
     h("Historical vessel activity — daily trends")
-    st.caption("Compare vessel counts and types across all collection dates. A drop in vessel count at a high-risk strait is often the earliest disruption signal.")
+    st.markdown('<p style="font-size:13px;color:#c8d8e8;">Compare vessel counts and types across all collection dates. A drop in vessel count at a high-risk strait is often the earliest disruption signal.</p>', unsafe_allow_html=True)
 
     if not ais.empty and "fetch_date" in ais.columns:
         ais_hist = ais.copy()
@@ -1238,7 +1238,7 @@ elif page == "🛥  Vessel Activity":
             # Average speed trend
             if "sog_knots" in ais_hist.columns:
                 h("Average vessel speed over time (moving vessels only)")
-                st.caption("A drop in average speed = more vessels are slow or stationary = possible congestion.")
+                st.markdown('<p style="font-size:13px;color:#c8d8e8;">A drop in average speed = more vessels are slow or stationary = possible congestion.</p>', unsafe_allow_html=True)
                 daily_spd = (ais_hist[ais_hist["sog_knots"].fillna(0) > 0.5]
                              .groupby("fetch_date")["sog_knots"]
                              .mean().reset_index()
@@ -1443,7 +1443,7 @@ elif page == "🔗 Cross-Source Insights":
     if not svt.empty and "strait_name" in svt.columns:
         h("Vessel traffic trends at critical straits")
         st.markdown("""
-        <div style="font-size:12px;color:#8aacc8;margin-bottom:8px;">
+        <div style="font-size:12px;color:#c8d8e8;margin-bottom:8px;">
         Daily vessel counts per strait — built from automated AIS collection.
         A significant drop in tanker count at Hormuz or Bab el-Mandeb often
         signals route disruption before official news confirms it.
@@ -1512,7 +1512,7 @@ elif page == "🔗 Cross-Source Insights":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown("""
 <div style="margin-top:3rem;padding:1rem;border-top:1px solid #1e3a5f;
-            text-align:center;font-size:11px;color:#2a4a6a;">
+            text-align:center;font-size:11px;color:#4a7fa5;">
   MSBA 305 — Maritime Shipping Intelligence Pipeline &nbsp;·&nbsp;
   Sources: UN Comtrade · BDI (investing.com, manual) · OpenWeatherMap · AISStream &nbsp;·&nbsp;
   Storage: Google BigQuery &nbsp;·&nbsp; 10 analytical insight tables
