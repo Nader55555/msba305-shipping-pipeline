@@ -2,7 +2,7 @@
 **MSBA 305 — Data Processing Framework | Spring 2025/2026**
 **Instructor:** Dr. Ahmad El-Hajj | **Domain:** Maritime Shipping & Supply Chain Intelligence
 
-**Live Dashboard:** [Streamlit Community Cloud](https://share.streamlit.io) | **GitHub:** [Nader55555/msba305-shipping-pipeline](https://github.com/Nader55555/msba305-shipping-pipeline)
+**Live Dashboard:** https://msba305-shipping-pipeline-r2aztbz4hje8sbk4snzhru.streamlit.app/ | **GitHub:** [Nader55555/msba305-shipping-pipeline](https://github.com/Nader55555/msba305-shipping-pipeline)
 
 ---
 
