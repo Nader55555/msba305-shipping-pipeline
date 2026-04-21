@@ -165,8 +165,8 @@ def main():
     print("\n=== SHIPPING NEWS INGESTION (NewsData.io) ===")
 
     if not NEWSDATA_API_KEY:
-        print("✗ NEWSDATA_API_KEY not set — check GitHub Secrets")
-        sys.exit(1)
+        print("⚠ NEWSDATA_API_KEY not set — skipping news ingestion (pipeline continues)")
+        sys.exit(0)  # exit 0 so GitHub Actions continues to next step
 
     all_articles = []
     for query in SEARCH_QUERIES:
@@ -178,7 +178,7 @@ def main():
     df = build_news_df(all_articles)
 
     if df.empty:
-        print("⚠ No news articles fetched — skipping upload")
+        print("⚠ No news articles fetched — skipping upload (non-fatal)")
         sys.exit(0)
 
     print(f"\n✓ {len(df):,} unique articles after deduplication")
