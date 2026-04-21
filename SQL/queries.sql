@@ -840,3 +840,180 @@ ORDER BY cl.china_share_pct DESC;
  bearish_days_30d shows whether the BEARISH signal is a one-day event
  or a sustained 30-day trend — sustained trends are much more significant.
 */
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- NEW QUERIES — Fuel, News, Route Analytics (added with 6-source pipeline)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- QUERY 17 (Simple) — Fuel Price Signal Today
+-- Business question: Is ship fuel expensive or cheap relative to recent history?
+-- This directly affects freight margins — high fuel + high BDI = double pressure.
+SELECT
+    date,
+    brent_usd_per_bbl                                    AS brent_price,
+    brent_30d_avg                                        AS thirty_day_avg,
+    fuel_pressure_score,
+    fuel_signal,
+    ROUND(vlsfo_est_usd_per_mt, 2)                       AS est_ship_fuel_per_tonne
+FROM `shipping_data.fuel_prices_daily`
+ORDER BY date DESC
+LIMIT 10;
+-- Performance: 90-row table, <1 second. No optimization needed.
+-- Result: Latest 10 days of Brent crude prices with signal classification.
+-- Business interpretation: When fuel_signal = HIGH and BDI is BULLISH simultaneously,
+-- shipping costs are under double pressure — freight buyers should lock in contracts immediately.
+
+
+-- QUERY 18 (Simple) — High-Risk Shipping News Today
+-- Business question: What shipping news events are happening right now, and which routes do they affect?
+SELECT
+    pub_date,
+    title,
+    source_name,
+    risk_level,
+    risk_score,
+    relevant_routes
+FROM `shipping_data.shipping_news`
+WHERE risk_level IN ('HIGH','MEDIUM')
+ORDER BY risk_score DESC, pub_date DESC
+LIMIT 20;
+-- Performance: ~40-row table, <1 second.
+-- Business interpretation: HIGH risk articles about Suez/Hormuz warrant immediate
+-- review of route disruption table to confirm if vessel traffic corroborates the news.
+
+
+-- QUERY 19 (Medium) — Route Impact vs Historical Baseline
+-- Business question: Which trade routes are showing abnormal vessel activity today
+-- compared to their historical average, and what is driving the deviation?
+SELECT
+    event_date,
+    route,
+    current_vessels,
+    baseline_avg_vessels,
+    traffic_vs_history_pct,
+    speed_gap_knots,
+    fuel_signal,
+    news_risk_score,
+    route_impact_score,
+    status
+FROM `shipping_data.analysis_current_vs_historical`
+ORDER BY route_impact_score DESC;
+-- Performance: 5-row table (one per route), <1 second.
+-- Business interpretation: A route with traffic_vs_history_pct < -20% means
+-- 20% fewer ships than normal are using this route — an early disruption signal
+-- that often precedes official news by 2-7 days.
+
+
+-- QUERY 20 (Medium) — Fuel × BDI Combined Pressure Index
+-- Business question: When are BOTH freight rates AND fuel costs elevated simultaneously?
+-- This represents maximum shipping cost pressure.
+WITH latest_fuel AS (
+    SELECT
+        fuel_pressure_score,
+        fuel_signal,
+        brent_usd_per_bbl
+    FROM `shipping_data.fuel_prices_daily`
+    ORDER BY date DESC
+    LIMIT 1
+),
+latest_bdi AS (
+    SELECT
+        bdi_value,
+        market_signal,
+        rolling_30d_avg,
+        above_long_avg
+    FROM `shipping_data.bdi_daily`
+    ORDER BY date DESC
+    LIMIT 1
+)
+SELECT
+    lf.brent_usd_per_bbl,
+    lf.fuel_signal,
+    lf.fuel_pressure_score,
+    lb.bdi_value,
+    lb.market_signal                                     AS bdi_signal,
+    lb.above_long_avg,
+    CASE
+        WHEN lf.fuel_signal IN ('HIGH','ELEVATED')
+         AND lb.market_signal IN ('BULLISH','OVERBOUGHT')
+        THEN 'DOUBLE PRESSURE — Lock in contracts now'
+        WHEN lf.fuel_signal = 'HIGH'
+         OR  lb.market_signal IN ('BULLISH','OVERBOUGHT')
+        THEN 'SINGLE PRESSURE — Monitor closely'
+        WHEN lf.fuel_signal = 'LOW'
+         AND lb.market_signal IN ('BEARISH','OVERSOLD')
+        THEN 'OPPORTUNITY — Cheap freight + cheap fuel'
+        ELSE 'NORMAL — Standard conditions'
+    END                                                  AS combined_shipping_signal
+FROM latest_fuel lf
+CROSS JOIN latest_bdi lb;
+-- Business interpretation: "DOUBLE PRESSURE" is the most actionable signal —
+-- it means both operating costs (fuel) and charter costs (BDI) are elevated.
+-- Historically this occurs during supply chain crises and drives commodity price increases.
+
+
+-- QUERY 21 (Complex) — Full Cross-Source Route Risk Matrix
+-- Business question: For each trade route, what is the combined risk from
+-- weather, geopolitical score, vessel traffic anomaly, fuel pressure, and news?
+-- This is the most comprehensive query in the pipeline.
+WITH latest_weather AS (
+    SELECT MAX(fetch_date) AS max_date
+    FROM `shipping_data.strait_conditions`
+),
+strait_risk AS (
+    SELECT
+        sc.strait_name,
+        sc.disruption_score,
+        sc.risk_level,
+        sc.geopolitical_risk
+    FROM `shipping_data.strait_conditions` sc
+    JOIN latest_weather lw ON sc.fetch_date = lw.max_date
+),
+latest_fuel AS (
+    SELECT fuel_pressure_score, fuel_signal
+    FROM `shipping_data.fuel_prices_daily`
+    ORDER BY date DESC
+    LIMIT 1
+),
+news_risk AS (
+    SELECT
+        relevant_routes,
+        MAX(risk_score)     AS max_news_risk,
+        COUNT(*)            AS article_count
+    FROM `shipping_data.shipping_news`
+    WHERE risk_level IN ('HIGH','MEDIUM')
+    GROUP BY relevant_routes
+)
+SELECT
+    cvh.route,
+    cvh.route_impact_score,
+    cvh.status,
+    cvh.current_vessels,
+    ROUND(cvh.traffic_vs_history_pct, 1)                AS traffic_vs_history_pct,
+    cvh.fuel_signal,
+    ROUND(cvh.news_risk_score, 0)                       AS news_risk,
+    COALESCE(sr.disruption_score, 0)                    AS strait_disruption_score,
+    COALESCE(sr.geopolitical_risk, 'Unknown')           AS geopolitical_risk,
+    ROUND(
+        cvh.route_impact_score * 0.4 +
+        COALESCE(sr.disruption_score, 0) * 0.4 +
+        COALESCE(cvh.news_risk_score, 0) * 0.2, 1
+    )                                                   AS composite_risk_score,
+    CASE
+        WHEN cvh.traffic_vs_history_pct < -30
+        THEN 'WARNING: Severe traffic drop — rerouting likely already occurring'
+        WHEN cvh.route_impact_score >= 60
+        THEN 'ALERT: Critical combined pressure on route'
+        WHEN cvh.fuel_signal = 'HIGH' AND cvh.news_risk_score >= 60
+        THEN 'CAUTION: High fuel cost + elevated news risk'
+        ELSE 'Normal operating conditions'
+    END                                                 AS risk_interpretation
+FROM `shipping_data.analysis_current_vs_historical` cvh
+LEFT JOIN strait_risk sr
+    ON LOWER(sr.strait_name) LIKE LOWER(SPLIT(cvh.route,' ')[OFFSET(0)] || '%')
+CROSS JOIN latest_fuel lf
+ORDER BY composite_risk_score DESC;
+-- Performance: Joins 4 tables (5-50 rows each), <2 seconds.
+-- Business interpretation: This is the definitive daily route risk assessment.
+-- composite_risk_score > 50 on any route warrants escalation to supply chain
+-- management. All 6 data sources contribute to this single score.
