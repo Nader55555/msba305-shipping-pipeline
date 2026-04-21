@@ -2,7 +2,8 @@ name: Daily Maritime Data Update
 
 on:
   schedule:
-    - cron: '0 17 * * 1-5'  # weekdays 17:00 UTC = 20:00 Lebanon (UTC+3)
+    - cron: '0 6 * * 1-5'   # 06:00 UTC = 09:00 Lebanon — morning run
+    - cron: '0 17 * * 1-5'  # 17:00 UTC = 20:00 Lebanon — evening run
   workflow_dispatch:
 
 jobs:
@@ -41,7 +42,7 @@ jobs:
         run: python scripts/ingest_ais.py
 
       - name: Fetch fuel prices from EIA API
-        continue-on-error: true   # non-fatal — pipeline continues if EIA fails
+        continue-on-error: true
         env:
           EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
           BQ_PROJECT:  ${{ secrets.BQ_PROJECT }}
@@ -49,8 +50,8 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
         run: python scripts/ingest_fuel.py
 
-      - name: Fetch shipping news from NewsData.io
-        continue-on-error: true   # non-fatal — pipeline continues if news API fails
+      - name: Fetch shipping news
+        continue-on-error: true
         env:
           NEWSDATA_API_KEY: ${{ secrets.NEWSDATA_API_KEY }}
           BQ_PROJECT:       ${{ secrets.BQ_PROJECT }}
@@ -58,7 +59,7 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS: gcp_key.json
         run: python scripts/ingest_news.py
 
-      - name: Build route analytics and deviation alerts
+      - name: Build route analytics
         env:
           BQ_PROJECT: ${{ secrets.BQ_PROJECT }}
           BQ_DATASET: ${{ secrets.BQ_DATASET }}
