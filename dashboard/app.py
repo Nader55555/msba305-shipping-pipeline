@@ -53,15 +53,7 @@ st.markdown("""
   }
   [data-testid="metric-container"] label { color: #ffffff !important; font-size: 12px !important; font-weight: 500 !important; }
   [data-testid="metric-container"] [data-testid="stMetricValue"] {
-      color: #ffffff !important;
-      font-weight: 700 !important;
-  }
-  
-  [data-testid="metric-container"] [data-testid="stMetricValue"] p {
-      font-size: 18px !important;
-      font-weight: 700 !important;
-      margin: 0 !important;
-      line-height: 1.1 !important;
+      color: #ffffff !important; font-size: 26px !important; font-weight: 700 !important;
   }
   .section-header {
     font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: #90c4e8;
