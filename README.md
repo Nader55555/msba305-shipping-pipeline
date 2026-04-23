@@ -41,7 +41,7 @@
 3. `ingest_fuel.py` — EIA Brent crude price
 4. `ingest_news.py` — shipping news + risk classification
 5. `build_route_analytics.py` — route impact vs historical baseline
-6. `upda` — rebuild all 12+ analytical tables
+6. `update_combined.py` — rebuild 11 analytical tables
 
 ---
 
