@@ -32,16 +32,16 @@ Then open `http://localhost:8501`. In the sidebar, toggle **Connect to BigQuery*
 |--------|-----------------|---------|
 | **UN Comtrade** | Trade flows between 188 countries, 5 commodity categories | Annual |
 | **BDI (investing.com)** | Baltic Dry Index — daily freight cost index 2015–2026 | Monthly (manual) |
-| **OpenWeatherMap** | Real-time weather at 20 ports + 8 straits | Twice daily |
+| **OpenWeatherMap** | Real-time weather at 120 ports + 8 straits | Twice daily |
 | **AISStream** | Live vessel positions globally (~21,000 ships/day) | Twice daily |
 | **EIA (U.S. Energy)** | Brent crude oil daily price — last 90 days | Twice daily |
 | **NewsAPI.org** | Maritime shipping news classified by risk level and route | Twice daily |
 
 ---
 
-## The 20 monitored ports — why these?
+## The 120 monitored ports — why these?
 
-These are the **20 busiest container and bulk cargo ports** by annual throughput, handling ~60% of global container trade:
+These are the **120 busiest container and bulk cargo ports** by annual throughput, handling ~60% of global container trade:
 
 Shanghai, Singapore, Ningbo-Zhoushan, Shenzhen, Guangzhou, Busan, Tianjin, Hong Kong, Rotterdam, Dubai, Port Klang, Antwerp, Xiamen, Los Angeles, Hamburg, Long Beach, Tanjung Pelepas, Kaohsiung, Dalian, New York.
 
@@ -254,7 +254,7 @@ Below the KPIs: route status cards, port weather alerts, strait mini-cards, BDI 
 ---
 
 ### ⚓ 7. Port Risk
-**Real-time weather at 20 major ports + trade exposure.**
+**Real-time weather at 120 major ports + trade exposure.**
 
 **Beaufort scale — when does it affect shipping?**
 
