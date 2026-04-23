@@ -29,7 +29,7 @@
 [AISStream WS API]   ── ingest_ais.py ───────► BigQuery (daily) ─────────────┤──► update_combined.py
 [EIA REST API]       ── ingest_fuel.py ──────► BigQuery (daily) ─────────────┤       │
 [NewsAPI.org]        ── ingest_news.py ──────► BigQuery (daily) ─────────────┤       ▼
-                                                                              │   BigQuery (16+ tables)
+                                                                              │   BigQuery (21+ tables)
                      build_route_analytics.py ◄──────────────────────────────┘       │
                             │                                                         ▼
                             └──────────────────────────────────────────────► Streamlit Dashboard
@@ -41,7 +41,7 @@
 3. `ingest_fuel.py` — EIA Brent crude price
 4. `ingest_news.py` — shipping news + risk classification
 5. `build_route_analytics.py` — route impact vs historical baseline
-6. `update_combined.py` — rebuild all 12+ analytical tables
+6. `upda` — rebuild all 12+ analytical tables
 
 ---
 
@@ -64,12 +64,12 @@
 │   ├── ingest_fuel.py                # EIA API → BigQuery
 │   ├── ingest_news.py                # NewsAPI.org → BigQuery
 │   ├── build_route_analytics.py      # Route impact vs history → BigQuery
-│   └── update_combined.py            # 12 analytical JOIN tables → BigQuery
+│   └── update_combined.py            # 11 analytical JOIN tables → BigQuery
 ├── dashboard/
 │   ├── app.py                        # Streamlit dashboard (9 pages)
 │   └── user_guide.md                 # Plain-language user guide
 ├── SQL/
-│   └── queries.sql                   # 16 analytical queries (simple → complex)
+│   └── queries.sql                   # 21 analytical queries (simple → complex)
 ├── data/
 │   ├── raw/                          # Never committed — original downloads
 │   └── clean/                        # Committed: cleaned CSVs + EDA figures
@@ -136,7 +136,7 @@ The workflow triggers automatically. To run manually:
 | `fuel_prices_daily` | ingest_fuel.py | EIA Brent crude price — 90 days |
 | `shipping_news` | ingest_news.py | Maritime news with risk classification |
 
-### Analytical tables (12, rebuilt daily by update_combined.py)
+### Analytical tables (11, rebuilt daily by update_combined.py)
 | Table | Join keys | Business insight |
 |-------|-----------|-----------------|
 | `analysis_bdi_trade` | year | BDI vs annual trade volume correlation |
