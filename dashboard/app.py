@@ -10,7 +10,7 @@ Run: streamlit run dashboard/app.py
   4. Route Disruption      — 6 key trade routes: are they clear today?
   5. Baltic Dry Index      — BDI trend, signals, charter recommendations
   6. Trade Analysis        — Comtrade flows, balance, commodity breakdown
-  7. Port Risk             — 20 ports: weather + trade exposure
+  7. Port Risk             — 100 ports: weather + trade exposure
   8. Vessel Activity       — AIS positions, vessel types, speeds
   9. Cross-Source Insights — BDI×Trade, China concentration, seasonal booking
 """
@@ -553,7 +553,7 @@ elif page == "📊 Executive Summary":
         elif not wx.empty and "port_risk_flag" in wx.columns:
             risky = wx[wx["port_risk_flag"] == True]
             if risky.empty:
-                alert_box("green", "✓ All 20 ports operating under normal conditions.")
+                alert_box("green", "✓ All 100 ports operating under normal conditions.")
             else:
                 for _, row in risky.iterrows():
                     alert_box("amber", f"⚠ <b>{row.get('port_name','')} ({row.get('country_iso','')})</b> — Bf{row.get('beaufort_number','')} {row.get('beaufort_desc','')}")
@@ -1076,7 +1076,7 @@ elif page == "🌍 Trade Analysis":
 # PAGE 6 — PORT RISK
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "🌦  Port Risk":
-    title("Port Risk", "20 ports: real-time weather × trade exposure")
+    title("Port Risk", "100 ports: real-time weather × trade exposure")
 
     if wx.empty:
         alert_box("red", "Port weather data not available."); st.stop()
@@ -1199,7 +1199,7 @@ elif page == "🌦  Port Risk":
 # PAGE 7 — VESSEL ACTIVITY
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "🛥  Vessel Activity":
-    title("Vessel Activity", "AIS Stream — daily vessel tracking at 8 straits + 20 ports")
+    title("Vessel Activity", "AIS Stream — daily vessel tracking at 8 straits + 100 ports")
 
     if ais.empty:
         alert_box("red", "AIS data not available."); st.stop()
