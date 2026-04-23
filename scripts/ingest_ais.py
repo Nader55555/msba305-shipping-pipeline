@@ -1,6 +1,6 @@
 """
 scripts/ingest_ais.py
-Daily AIS vessel tracking — 8 critical straits + 20 major ports.
+Daily AIS vessel tracking — 8 critical straits + 100 major ports.
 
 Connects to AISStream WebSocket for COLLECT_SECONDS (default 240 = 4 minutes),
 captures vessel positions at defined bounding boxes, then disconnects cleanly.
