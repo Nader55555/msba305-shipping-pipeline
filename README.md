@@ -12,7 +12,7 @@
 |---|--------|--------|-----------|-------------|
 | 1 | **UN Comtrade** — bilateral trade flows, 5 HS codes (10,26,27,72,89) | CSV manual download | Annual | No |
 | 2 | **BDI (investing.com)** — Baltic Dry Index freight cost indicator | CSV manual download | Monthly | No |
-| 3 | **OpenWeatherMap** — weather at 20 ports + 8 critical straits | JSON REST API | Daily automated | Yes — free |
+| 3 | **OpenWeatherMap** — weather at 100 ports + 8 critical straits | JSON REST API | Daily automated | Yes — free |
 | 4 | **AISStream** — live vessel positions globally | WebSocket API | Daily automated (4 min) | Yes — free |
 | 5 | **EIA (U.S. Energy Information Administration)** — Brent crude oil daily price | JSON REST API | Daily automated | Yes — free |
 | 6 | **NewsAPI.org** — maritime shipping news, risk classification | JSON REST API | Daily automated | Yes — free |
@@ -36,7 +36,7 @@
 ```
 
 **GitHub Actions daily run order (weekdays 17:00 + 23:00 UTC):**
-1. `ingest_weather.py` — 20 ports + 8 straits
+1. `ingest_weather.py` — 100 ports + 8 straits
 2. `ingest_ais.py` — 4-minute global AIS collection
 3. `ingest_fuel.py` — EIA Brent crude price
 4. `ingest_news.py` — shipping news + risk classification
@@ -132,7 +132,7 @@ The workflow triggers automatically. To run manually:
 |-------|-----------|-------------|
 | `trade_flows` | Notebook 01 | UN Comtrade bilateral trade, 5 HS codes |
 | `bdi_daily` | Manual monthly | Baltic Dry Index full history |
-| `port_weather` | ingest_weather.py | OpenWeatherMap — 20 ports (APPEND) |
+| `port_weather` | ingest_weather.py | OpenWeatherMap — 100 ports (APPEND) |
 | `strait_conditions` | ingest_weather.py | 8 chokepoints (APPEND) |
 | `vessel_movements` | ingest_ais.py | Global AIS vessel positions (APPEND) |
 | `fuel_prices_daily` | ingest_fuel.py | EIA Brent crude price — 90 days |
@@ -174,7 +174,7 @@ Run locally: `streamlit run dashboard/app.py`
 | 🚢 Route Disruption | 6 trade routes — CLEAR / WATCH / DISRUPTED |
 | 📈 Baltic Dry Index | BDI trend, market signals, charter recommendations |
 | 🌍 Trade Analysis | Comtrade flows, trade balance, BDI correlation |
-| ⚓ Port Risk | 20 ports — weather + trade exposure |
+| ⚓ Port Risk | 100 ports — weather + trade exposure |
 | 🛥 Vessel Activity | AIS positions + historical trends + strait traffic |
 | 🔗 Cross-Source Insights | Freight burden, China concentration, booking calendar |
 
