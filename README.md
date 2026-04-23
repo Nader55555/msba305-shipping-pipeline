@@ -97,7 +97,7 @@
 ```
 01 → 02 → 03 → 04 → 05 → 06
 ```
-Notebook 06 creates all BigQuery tables. Run it once before enabling Actions.
+Notebook 06 is for one-time/manual BigQuery setup of base tables. Daily updates are handled by the Python scripts via GitHub Actions.
 
 ### Step 3 — Update BDI (monthly)
 1. Go to: https://www.investing.com/indices/baltic-dry-historical-data
@@ -125,9 +125,9 @@ The workflow triggers automatically. To run manually:
 
 ---
 
-## BigQuery Tables (19 total)
+## BigQuery Tables (21 total)
 
-### Source tables (5)
+### Source tables (7)
 | Table | Updated by | Description |
 |-------|-----------|-------------|
 | `trade_flows` | Notebook 01 | UN Comtrade bilateral trade, 5 HS codes |
