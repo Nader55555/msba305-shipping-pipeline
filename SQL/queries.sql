@@ -18,28 +18,28 @@
 
 
 -- ────────────────────────────────────────────────────────────────
--- QUERY 1 (Simple) — Top 10 Trade Routes by Export Value
--- Business question: Which country pairs drive the most trade?
+-- QUERY 1 (Simple) — Top 10 Exporters to the World by Export Value
+-- Business question: Which exporting countries contribute the most total export value?
 -- Tables: trade_flows
+-- Note: partner_country is aggregated as 'World' in this dataset,
+-- so this query shows exporter totals, not bilateral country pairs.
 -- ────────────────────────────────────────────────────────────────
+
 SELECT
-    reporter_country                                           AS exporter,
-    partner_country                                            AS importer,
-    ROUND(SUM(trade_value_usd) / 1e9, 2)                      AS total_value_billion_usd,
-    COUNT(DISTINCT year)                                       AS years_active,
-    ROUND(AVG(trade_value_usd) / 1e9, 2)                      AS avg_annual_value_B
+    reporter_country AS exporter,
+    ROUND(SUM(trade_value_usd) / 1e9, 2) AS total_value_billion_usd
 FROM `shipping_data.trade_flows`
 WHERE flow_direction = 'Export'
-  AND partner_country != 'World'
-GROUP BY 1, 2
+GROUP BY 1
 ORDER BY total_value_billion_usd DESC
 LIMIT 10;
 
 /*
  INTERPRETATION:
- Top routes dominated by China → USA and China → EU reflect global
- manufacturing concentration. These routes also align with the highest
- BDI volatility periods, suggesting demand-driven freight cost spikes.
+ This result shows the countries with the highest total export value
+ in the dataset. Since partner_country is only 'World', the query
+ measures overall export strength, not specific exporter-importer routes.
+ High-ranking countries reflect broad trade scale across the selected HS codes.
 */
 
 
@@ -633,6 +633,7 @@ ORDER BY ce.china_share_pct DESC;
 -- Tables: analysis_strait_monitor, analysis_route_disruption,
 --         analysis_port_risk_trade
 -- ────────────────────────────────────────────────────────────────
+
 WITH asia_europe_straits AS (
     SELECT
         strait_name,
@@ -651,47 +652,57 @@ WITH asia_europe_straits AS (
         'Strait of Gibraltar'
     )
 ),
+
 origin_ports AS (
-    -- Key Asian origin ports for this route
     SELECT
         port_name,
         beaufort_number,
-        CAST(port_risk_flag AS BOOL)                           AS at_risk,
-        total_B                                                AS trade_B,
+        CAST(port_risk_flag AS BOOL) AS at_risk,
+        total_B AS trade_B,
         business_alert
     FROM `shipping_data.analysis_port_risk_trade`
     WHERE port_name IN ('Shanghai', 'Ningbo-Zhoushan', 'Shenzhen', 'Busan')
 ),
+
 dest_ports AS (
-    -- Key European destination ports
     SELECT
         port_name,
         beaufort_number,
-        CAST(port_risk_flag AS BOOL)                           AS at_risk,
-        total_B                                                AS trade_B,
+        CAST(port_risk_flag AS BOOL) AS at_risk,
+        total_B AS trade_B,
         business_alert
     FROM `shipping_data.analysis_port_risk_trade`
     WHERE port_name IN ('Rotterdam', 'Antwerp', 'Hamburg')
 ),
+
 route_summary AS (
     SELECT
-        'Asia → Europe (via Suez)'                             AS route,
-        -- Weighted average disruption across the 3 straits
-        ROUND(AVG(s.disruption_score), 1)                     AS avg_strait_score,
-        MAX(s.disruption_score)                                AS worst_strait_score,
+        'Asia → Europe (via Suez)' AS route,
+        ROUND(AVG(s.disruption_score), 1) AS avg_strait_score,
+        MAX(s.disruption_score) AS worst_strait_score,
         STRING_AGG(
-            CONCAT(s.strait_name, ': ', CAST(s.disruption_score AS STRING), '/100 (', s.risk_level, ')'),
+            CONCAT(
+                s.strait_name, ': ',
+                CAST(s.disruption_score AS STRING), '/100 (', s.risk_level, ')'
+            ),
             ' | ' ORDER BY s.disruption_score DESC
-        )                                                      AS strait_breakdown,
-        MAX(s.geopolitical_risk)                               AS highest_geo_risk,
-        SUM(s.trade_pct_global)                                AS total_trade_pct_through_straits,
-        COUNT(CASE WHEN o.at_risk THEN 1 END)                  AS origin_ports_at_risk,
-        COUNT(CASE WHEN d.at_risk THEN 1 END)                  AS dest_ports_at_risk
+        ) AS strait_breakdown,
+        MAX(s.geopolitical_risk) AS highest_geo_risk,
+        SUM(s.trade_pct_global) AS total_trade_pct_through_straits,
+        MAX(o.cnt) AS origin_ports_at_risk,
+        MAX(d.cnt) AS dest_ports_at_risk
     FROM asia_europe_straits s
-    CROSS JOIN (SELECT COUNT(CASE WHEN at_risk THEN 1 END) AS cnt FROM origin_ports) o
-    CROSS JOIN (SELECT COUNT(CASE WHEN at_risk THEN 1 END) AS cnt FROM dest_ports)   d
+    CROSS JOIN (
+        SELECT COUNT(CASE WHEN at_risk THEN 1 END) AS cnt
+        FROM origin_ports
+    ) o
+    CROSS JOIN (
+        SELECT COUNT(CASE WHEN at_risk THEN 1 END) AS cnt
+        FROM dest_ports
+    ) d
     GROUP BY route
 )
+
 SELECT
     rs.route,
     rs.avg_strait_score,
@@ -707,8 +718,8 @@ SELECT
         WHEN rs.worst_strait_score >= 40 OR rs.origin_ports_at_risk >= 1
         THEN '🟡 ROUTE UNDER WATCH — Monitor conditions closely'
         ELSE '🟢 ROUTE CLEAR — Normal transit expected'
-    END                                                        AS route_status,
-    'Cape of Good Hope (+14 days, ~+$1M/voyage)'               AS alternative_route
+    END AS route_status,
+    'Cape of Good Hope (+14 days, ~+$1M/voyage)' AS alternative_route
 FROM route_summary rs;
 
 /*
@@ -729,12 +740,12 @@ FROM route_summary rs;
 -- AND China dominates a commodity, it may signal a demand shock
 -- originating from China. Identify which commodities face this
 -- compounded signal today.
--- Uses: Multiple CTEs, LAG window, cross-source JOIN
+-- Uses: Multiple CTEs, cross-source JOIN
 -- Tables: analysis_bdi_signals, analysis_china_concentration,
 --         analysis_commodity_bdi
 -- ────────────────────────────────────────────────────────────────
+
 WITH latest_signal AS (
-    -- Most recent BDI signal
     SELECT
         date,
         bdi_value,
@@ -743,20 +754,19 @@ WITH latest_signal AS (
         charter_recommendation,
         rolling_30d_avg,
         rolling_90d_avg,
-        -- How far below the 90d average?
         ROUND((bdi_value - rolling_90d_avg) / NULLIF(rolling_90d_avg, 0) * 100, 1)
-                                                               AS pct_vs_90d_avg
+            AS pct_vs_90d_avg
     FROM `shipping_data.analysis_bdi_signals`
     ORDER BY date DESC
     LIMIT 1
 ),
+
 recent_bdi_trend AS (
-    -- 30-day signal distribution to confirm sustained trend
     SELECT
-        COUNTIF(market_signal = 'BEARISH')                    AS bearish_days_30d,
-        COUNTIF(market_signal = 'BULLISH')                    AS bullish_days_30d,
-        COUNTIF(market_signal = 'NEUTRAL')                    AS neutral_days_30d,
-        ROUND(AVG(bdi_value), 0)                              AS avg_bdi_30d
+        COUNTIF(market_signal = 'BEARISH') AS bearish_days_30d,
+        COUNTIF(market_signal = 'BULLISH') AS bullish_days_30d,
+        COUNTIF(market_signal = 'NEUTRAL') AS neutral_days_30d,
+        ROUND(AVG(bdi_value), 0) AS avg_bdi_30d
     FROM (
         SELECT market_signal, bdi_value
         FROM `shipping_data.analysis_bdi_signals`
@@ -764,61 +774,73 @@ recent_bdi_trend AS (
         LIMIT 30
     )
 ),
+
 china_latest AS (
     SELECT
         commodity_name,
         china_share_pct,
-        china_export_B,
-        world_export_B,
+        china_export_usd,
+        world_export_usd,
         supply_concentration,
         china_port_risk_today,
         china_max_beaufort
     FROM `shipping_data.analysis_china_concentration`
-    WHERE year = (SELECT MAX(year) FROM `shipping_data.analysis_china_concentration`)
+    WHERE year = (
+        SELECT MAX(year)
+        FROM `shipping_data.analysis_china_concentration`
+    )
 ),
+
 commodity_sensitivity AS (
     SELECT
         commodity_name,
         bdi_sensitivity,
-        ROUND(AVG(freight_burden_index), 4)                   AS avg_freight_burden
+        ROUND(AVG(freight_burden_index), 4) AS avg_freight_burden
     FROM `shipping_data.analysis_commodity_bdi`
     GROUP BY commodity_name, bdi_sensitivity
 )
+
 SELECT
-    ls.date                                                    AS signal_date,
+    ls.date AS signal_date,
     ls.bdi_value,
     ls.market_signal,
-    ls.pct_vs_90d_avg                                         AS bdi_pct_vs_90d_avg,
+    ls.pct_vs_90d_avg AS bdi_pct_vs_90d_avg,
     ls.charter_recommendation,
     rb.bearish_days_30d,
     rb.bullish_days_30d,
     cl.commodity_name,
     cl.china_share_pct,
     cl.supply_concentration,
-    cl.china_export_B,
-    CAST(cl.china_port_risk_today AS STRING)                  AS china_port_risk,
+    ROUND(cl.china_export_usd / 1e9, 2) AS china_export_B,
+    ROUND(cl.world_export_usd / 1e9, 2) AS world_export_B,
+    CAST(cl.china_port_risk_today AS STRING) AS china_port_risk,
     cs.bdi_sensitivity,
-    ROUND(cs.avg_freight_burden, 4)                           AS freight_burden_index,
+    ROUND(cs.avg_freight_burden, 4) AS freight_burden_index,
     CASE
         WHEN ls.market_signal IN ('BEARISH','OVERSOLD')
          AND cl.china_share_pct > 40
          AND cl.china_port_risk_today = TRUE
         THEN '🔴 TRIPLE RISK: BDI weak + China dominates + China ports disrupted'
+
         WHEN ls.market_signal IN ('BEARISH','OVERSOLD')
          AND cl.china_share_pct > 40
         THEN '🟠 DOUBLE RISK: BDI weak + China dominates this commodity'
+
         WHEN ls.market_signal IN ('BEARISH','OVERSOLD')
          AND cs.bdi_sensitivity LIKE '%High%'
         THEN '🟡 FREIGHT RISK: BDI weak and commodity is freight-cost-sensitive'
+
         WHEN ls.market_signal IN ('BULLISH','OVERBOUGHT')
          AND cl.china_share_pct > 40
         THEN '🟡 DEMAND SIGNAL: BDI rising and China dominates — watch for price impact'
+
         ELSE '🟢 NO COMPOUNDED RISK SIGNAL'
-    END                                                        AS compounded_risk_signal
-FROM latest_signal     ls
+    END AS compounded_risk_signal
+FROM latest_signal ls
 CROSS JOIN recent_bdi_trend rb
-CROSS JOIN china_latest     cl
-JOIN commodity_sensitivity  cs ON cl.commodity_name = cs.commodity_name
+CROSS JOIN china_latest cl
+JOIN commodity_sensitivity cs
+  ON cl.commodity_name = cs.commodity_name
 ORDER BY cl.china_share_pct DESC;
 
 /*
@@ -876,7 +898,7 @@ SELECT
 FROM `shipping_data.shipping_news`
 WHERE risk_level IN ('HIGH','MEDIUM')
 ORDER BY risk_score DESC, pub_date DESC
-LIMIT 20;
+LIMIT 100;
 -- Performance: ~40-row table, <1 second.
 -- Business interpretation: HIGH risk articles about Suez/Hormuz warrant immediate
 -- review of route disruption table to confirm if vessel traffic corroborates the news.
@@ -907,6 +929,7 @@ ORDER BY route_impact_score DESC;
 -- QUERY 20 (Medium) — Fuel × BDI Combined Pressure Index
 -- Business question: When are BOTH freight rates AND fuel costs elevated simultaneously?
 -- This represents maximum shipping cost pressure.
+
 WITH latest_fuel AS (
     SELECT
         fuel_pressure_score,
@@ -920,9 +943,9 @@ latest_bdi AS (
     SELECT
         bdi_value,
         market_signal,
-        rolling_30d_avg,
-        above_long_avg
-    FROM `shipping_data.bdi_daily`
+        rolling_90d_avg,
+        bdi_value > rolling_90d_avg AS above_long_avg
+    FROM `shipping_data.analysis_bdi_signals`
     ORDER BY date DESC
     LIMIT 1
 )
@@ -931,22 +954,23 @@ SELECT
     lf.fuel_signal,
     lf.fuel_pressure_score,
     lb.bdi_value,
-    lb.market_signal                                     AS bdi_signal,
+    lb.market_signal AS bdi_signal,
     lb.above_long_avg,
     CASE
         WHEN lf.fuel_signal IN ('HIGH','ELEVATED')
          AND lb.market_signal IN ('BULLISH','OVERBOUGHT')
         THEN 'DOUBLE PRESSURE — Lock in contracts now'
         WHEN lf.fuel_signal = 'HIGH'
-         OR  lb.market_signal IN ('BULLISH','OVERBOUGHT')
+         OR lb.market_signal IN ('BULLISH','OVERBOUGHT')
         THEN 'SINGLE PRESSURE — Monitor closely'
         WHEN lf.fuel_signal = 'LOW'
          AND lb.market_signal IN ('BEARISH','OVERSOLD')
         THEN 'OPPORTUNITY — Cheap freight + cheap fuel'
         ELSE 'NORMAL — Standard conditions'
-    END                                                  AS combined_shipping_signal
+    END AS combined_shipping_signal
 FROM latest_fuel lf
 CROSS JOIN latest_bdi lb;
+
 -- Business interpretation: "DOUBLE PRESSURE" is the most actionable signal —
 -- it means both operating costs (fuel) and charter costs (BDI) are elevated.
 -- Historically this occurs during supply chain crises and drives commodity price increases.
