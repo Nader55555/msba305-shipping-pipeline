@@ -51,8 +51,6 @@
 .
 ├── .github/workflows/
 │   └── daily_update.yml              # Automated pipeline (runs twice daily)
-├── config/
-│   └── routes.yaml                   # 5 trade route definitions
 ├── notebooks/                        # Run once in order (Google Colab)
 │   ├── 01_clean_comtrade.ipynb       # UN Comtrade cleaning + EDA
 │   ├── 02_ingest_clean_bdi_investing.ipynb  # BDI cleaning
